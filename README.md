@@ -20,11 +20,12 @@ do
 done
  </pre>
  
- <video src="https://user-images.githubusercontent.com/19269061/141276068-1f77ef8e-a67f-464e-8a9a-526dca14c393.mp4" data-canonical-src="https://user-images.githubusercontent.com/19269061/141276068-1f77ef8e-a67f-464e-8a9a-526dca14c393.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 width-fit" loop="loop" >
 
-  </video>
   
-
+<video id="video" width="640px" height="350px" autoplay="autoplay" loop="loop" controls="controls">
+    <source src="https://user-images.githubusercontent.com/19269061/141276068-1f77ef8e-a67f-464e-8a9a-526dca14c393.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
 
 ### morphing ###
 
