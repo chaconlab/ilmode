@@ -20,7 +20,7 @@ do
 done
  </pre>
  
- <video src="https://user-images.githubusercontent.com/19269061/141276068-1f77ef8e-a67f-464e-8a9a-526dca14c393.mp4" data-canonical-src="https://user-images.githubusercontent.com/19269061/141276068-1f77ef8e-a67f-464e-8a9a-526dca14c393.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 width-fit" style="max-height:640px;">
+ <video src="https://user-images.githubusercontent.com/19269061/141276068-1f77ef8e-a67f-464e-8a9a-526dca14c393.mp4" data-canonical-src="https://user-images.githubusercontent.com/19269061/141276068-1f77ef8e-a67f-464e-8a9a-526dca14c393.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 width-fit" autoplay loop >
 
   </video>
   
