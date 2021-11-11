@@ -20,7 +20,7 @@ do
 done
  </pre>
  
- <video src="https://user-images.githubusercontent.com/19269061/141276068-1f77ef8e-a67f-464e-8a9a-526dca14c393.mp4" autoplay="autoplay" loop="loop" controls="controls" >
+ <video src="https://user-images.githubusercontent.com/19269061/141276068-1f77ef8e-a67f-464e-8a9a-526dca14c393.mp4" autoplay="true" loop="true" controls="controls" >
   </video>
 
 
