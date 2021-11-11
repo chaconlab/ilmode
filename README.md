@@ -19,6 +19,10 @@ do
      renum_tr.pl DHV10_3irsC1_ali_forward_traj.pdb   DHV10_3irsC1_ali_backward_traj.pdb > mode_$i.pdb     
 done
  </pre>
+ 
+ 
+ https://user-images.githubusercontent.com/58986949/115314310-805b2780-a1a7-11eb-8558-648a367ea231.mp4
+ 
  <video src="/images/mov1.mp4" data-canonical-src="/images/mov1.mp4" controls="controls">
 
  </video>
