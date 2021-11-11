@@ -1,0 +1,3 @@
+# ilmode> Welcome to ilmode v1.08
+ilmode> COMMAND: ../sbg/bin/ilmode_gcc DHV17_3hszA1_ali.pdb --start 81 --end 93 --chain A -m 2 -s 2 --skip_missingatoms -a 1 -C 1 --ns 1000 --drmsd 0.25 --rmsd 12 -o _sampling --seed 3121826659
+ilmode> Residues: 13  Dihedrals(DoFs): 25 
