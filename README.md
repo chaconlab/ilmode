@@ -21,11 +21,7 @@ done
  </pre>
  
  
- https://user-images.githubusercontent.com/58986949/115314310-805b2780-a1a7-11eb-8558-648a367ea231.mp4
- 
- <video src="/images/mov1.mp4" data-canonical-src="/images/mov1.mp4" controls="controls">
-
- </video>
+https://github.com/chaconlab/ilmode/images/mov1.mp4
    
 ### morphing ###
 
