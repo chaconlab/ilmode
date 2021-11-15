@@ -4,11 +4,18 @@ Normal Mode Analysis with constraints in internal coordinates
 
  
 ### sampling #### 
+
+Move loop along a given mode till reach a give rmsd from the inital position: 
 <pre>
-ilmode_gcc DHV17_3hszA1_ali.pdb --start 81 --end 93  --chain A -m 2 -s 2 --skip_missingatoms -a 1 -C 1 --ns 100 --drmsd 0.25 --rmsd 12 -o _sampling
-vmd -m DHV17_3hszA1_ali.pdb DHV17_3hszA1_ali_sampling_traj.pdb
+ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _mod1F -m 2 -s 0 -a  1  --rmsd 3 --drmsd 0.25 --verb 0
+ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _mod1B -m 2 -s 0 -a -1  --rmsd 3 --drmsd 0.25 --verb 0    
+../scripts/renum_tr.pl 3hsz_mod1F_traj.pdb 3hsz_mod1B_traj.pdb > 3hsz_mod1.pdb
 </pre>
 
+<video  width="320px" height="175px"  src="https://user-images.githubusercontent.com/19269061/141765600-329048b6-d184-4ae3-ba90-5e459d7ad189.mp4" autoplay="true" loop="true" controls="controls" >
+  </video>
+  
+  
 
 <pre>
 for ((i=1;i<=17;i++)); 
