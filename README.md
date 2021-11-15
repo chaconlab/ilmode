@@ -47,20 +47,23 @@ Also with option -s 2 can move --ns times  diffenrent random modal directions, i
 and you can do it at different rmsds (--rmsd 3.0,--rmsd 3.0).   
 
 <p float="left">
-  <img src="images/rmsd1.jpg" width="200"> 
-  <img src="images/rmsd2.jpg" width="200">
-  <img src="images/rmsd3.jpg" width="200"> 
-  <img src="images/rmsd4.jpg" width="200"> 
+  <img src="images/rmsd1.jpg" width="240"> 
+  <img src="images/rmsd2.jpg" width="240">
+  <img src="images/rmsd3.jpg" width="240"> 
+  <img src="images/rmsd4.jpg" width="240"> 
 </p>
 
+Rmsd 1.0 Å                 |Rmsd 3.0 Å                 |  Rmsd 6.0 Å
+:-------------------------:|:-------------------------:|:-------------------------:
+![](images/rmsd1.jpg)  |  ![](images/rmsd2.jpg)  |  ![](images/rmsd3.jpg) 
 
-![](images/rmsd1.jpg "Rmsd 1.0 Å ") ![](images/rmsd2.jpg "Rmsd 1.0 Å ")  ![](images/rmsd3.jpg "Rmsd 1.0 Å ") 
+
 
 </table>
  <tr width="100">
-  <td><img src="images/rmsd1.jpg"> </td>
-  <td><img src="images/rmsd3.jpg"> </td>
-  <td><img src="images/rmsd6.jpg"> </td>
+  <td><img src="images/rmsd1.jpg" width="240"> </td>
+  <td><img src="images/rmsd2.jpg" width="240"> </td>
+  <td><img src="images/rmsd3.jpg" width="240"> </td>
  </tr>
   <tr>
     <td align="center" ><b style="font-size:30px">  Rmsd 1.0 Å </b></td>
