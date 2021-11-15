@@ -8,7 +8,6 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include Release_new/subdir.mk
 -include subdir.mk
 -include objects.mk
 
@@ -38,19 +37,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: ../../../ilmode_gcc
+all: ../../../bin/ilmode_gcc
 
 # Tool invocations
-../../../ilmode_gcc: $(OBJS) $(USER_OBJS)
+../../../bin/ilmode_gcc: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	g++ -L../../../lib -o "../../../ilmode_gcc" $(OBJS) $(USER_OBJS) $(LIBS)
+	g++ -L../../../lib -o "../../../bin/ilmode_gcc" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(CC_DEPS)$(C++_DEPS)$(EXECUTABLES)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) ../../../ilmode_gcc
+	-$(RM) $(CC_DEPS)$(C++_DEPS)$(EXECUTABLES)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) ../../../bin/ilmode_gcc
 	-@echo ' '
 
 .PHONY: all clean dependents

@@ -24,24 +24,24 @@ typedef struct
 } inputdata;
 
 #define ptr_check(p) { \
-    if ((p) == NULL) { \
-        fprintf(stderr, "%s> Memory allocation failure. Exiting.\n", prog); \
-        exit(1); \
-    } \
+		if ((p) == NULL) { \
+			fprintf(stderr, "%s> Memory allocation failure. Exiting.\n", prog); \
+			exit(1); \
+		} \
 }
 
 #define SWAPPING(_a,_b,_type) \
-{\
-  _type _tmp;\
-  \
-  _tmp = (_a);\
-  (_a) = (_b);\
-  (_b) = _tmp;\
-}
+		{\
+	_type _tmp;\
+	\
+	_tmp = (_a);\
+	(_a) = (_b);\
+	(_b) = _tmp;\
+		}
 
 
 /*==============================================================================================*/
-char version[]="1.08"; // version code
+char version[]="1.09"; // version code
 char prog[]="ilmode"; // program name
 
 // Input variables
@@ -76,7 +76,7 @@ bool ss_switch = false; // the NMA force constants will be set according to SS r
 bool func_switch = false; // input file with function coefficients (Topology and SS)
 bool linear_switch = false; // =true --> linear motion
 bool morph_switch = false; // =true --> Enable morphing stuff
-bool mc_switch = false; // =true --> Enable Monte-Carlo stuff (random mode amplitudes)
+bool mr_switch = false; // =true --> Enable Monte-Carlo stuff (random mode amplitudes)
 bool loops_switch = false; // =true --> Enable multiple loops processing
 bool anchors_present = true; // =true --> Anchors are present in loops Multi-PDB, otherwise just mobile residues present
 
@@ -96,7 +96,7 @@ bool delHydrogens_switch = true; // Delete hydrogens
 bool delHeteros_switch = false; // Delete heteroatoms
 bool delWaters_switch = true; // Delete waters
 bool already_seed=false; // = true if seed has been defined by user
-bool loop_startend = true; // = true if Start and End residue indices were parsed
+// bool loop_startend = true; // = true if Start and End residue indices were parsed
 bool skip_missingatoms = false; // Set true to skip missing atoms
 bool ali_flanks = false; // Set true to enable flanks alignment
 float cte_k0 = 1.0; // Force constant factor for Inverse Exponential
@@ -394,11 +394,11 @@ int main( int argc, char * argv[] )
 	CmdLine cmd(argv[0],"Some text here... Shown with -h option", version );
 	try {
 
-		printf("EXAMPLES: \n"
-			   "  Example-1: %s DHV15_3agoA2.pdb 29 40 -t DHV15_3agnA1_ali.pdb -m 2 -i 1 -a 1 -C 1 -o helixchi -x\n"
-			   "  Example-2: %s DHV15_3agoA2.pdb 29 40 -t DHV15_3ahwA3_ali.pdb -m 2 -i 1 -a 1 -C 1 -o morphchi -x\n"
-			   "  Example-3: %s DHV15_3agoA2.pdb 29 40 -m 2 -n 3 -i 1 -a 1 -C 1 -o kk -x\n"
-			   "  Example-4: %s DHV15_3agoA2.pdb 29 40 -m 2 -i 1 -a 1 -s 2 --ns 100 --rmsd 2 -o kk\n",prog,prog,prog,prog);
+//		printf("EXAMPLES: \n"
+//				"  Example-1: %s DHV15_3agoA2.pdb 29 40 -t DHV15_3agnA1_ali.pdb -m 2 -i 1 -a 1 -C 1 -o helixchi -x\n"
+//				"  Example-2: %s DHV15_3agoA2.pdb 29 40 -t DHV15_3ahwA3_ali.pdb -m 2 -i 1 -a 1 -C 1 -o morphchi -x\n"
+//				"  Example-3: %s DHV15_3agoA2.pdb 29 40 -m 2 -n 3 -i 1 -a 1 -C 1 -o kk -x\n"
+//				"  Example-4: %s DHV15_3agoA2.pdb 29 40 -m 2 -i 1 -a 1 -s 2 --ns 100 --rmsd 2 -o kk\n",prog,prog,prog,prog);
 
 		// Define required arguments no labeled (mandatory)
 		// ---------------------------------------------------------------------------------------------------------------
@@ -407,17 +407,24 @@ int main( int argc, char * argv[] )
 				"Multi-run: Plain text file (.txt) with one basename of the PDB and loops per row, e.g. 1tca_1 corresponds to PDB file 1tca_1.pdb and loops file 1tca_1<loops_suffix>","default","pdb");
 		cmd.add( Input );
 
-//		UnlabeledValueArg<int> Start("start","N-terminal loop residue index, first mobile residue (PDB residue index).",1,"start");
-//		cmd.add( Start );
-//
-//		UnlabeledValueArg<int> End("end","C-terminal loop residue index, last mobile residue (PDB residue index).",2,"end");
-//		cmd.add( End );
+		UnlabeledValueArg<int> Start("start","N-terminal loop residue index, first mobile residue (PDB residue index).",1,"start");
+		cmd.add( Start );
+
+		UnlabeledValueArg<int> End("end","C-terminal loop residue index, last mobile residue (PDB residue index).",2,"end");
+		cmd.add( End );
+
+		//		ValueArg<int> Start("","start","N-terminal loop residue index, first mobile residue (PDB residue index).",false,-1,"int");
+		//		cmd.add( Start );
+		//
+		//        ValueArg<int> End("","end","C-terminal loop residue index, last mobile residue (PDB residue index).",false,-1,"int");
+		//		cmd.add( End );
+
 
 		// Optional arguments
 		// ---------------------------------------------------------------------------------------------------------------
 
 		ValueArg<int> Verb("","verb", "Verbose level (0=low, 1=medium, 2=high) (default=0).",false,0,"int");
-        cmd.add( Verb );
+		cmd.add( Verb );
 
 		ValueArg<unsigned int> Seed("","seed", "Pre-define the random number generator SEED (Mersenne Twister) (default=random-seed from /dev/urandom)",false,386,"unsigned int");
 		cmd.add( Seed );
@@ -466,7 +473,7 @@ int main( int argc, char * argv[] )
 		cmd.add( k0_Cutoff );
 
 		ValueArg<int> IndexMode("i","imod", "Index to select some mode (1,2,...,nevs) for computations (default=1).",false,1,"int");
-        cmd.add( IndexMode );
+		cmd.add( IndexMode );
 
 		SwitchArg Linear("","linear", "Enable linear motion using 1st order dy/dq derivatives, otherwise exact dihedral angles rotation (default=disabled).", true);
 		cmd.add( Linear );
@@ -475,60 +482,65 @@ int main( int argc, char * argv[] )
 		cmd.add( Chi );
 
 		ValueArg<float> Nevs("n","nevs", "Used modes range, either number [1,N] <integer>, or ratio [0,1) <float>. 0=All modes, 1= 1 mode. (default=All).",false,0.0,"int/float");
-        cmd.add( Nevs );
+		cmd.add( Nevs );
 
-        ValueArg<int> Scoring("","score", "Scoring model (only utilized in morphing): (default=1)\n"
-        		"  1= Atomic RMSD between current and target structures.\n"
-        		"  2= Dihedral angles RMSD between current and target structures.\n",false,1,"int");
-        cmd.add( Scoring );
+		ValueArg<int> Scoring("","score", "Scoring model (only utilized in morphing): (default=1)\n"
+				"  1= Atomic RMSD between current and target structures.\n"
+				"  2= Dihedral angles RMSD between current and target structures.\n",false,1,"int");
+		cmd.add( Scoring );
 
-        ValueArg<int> Contact("C","contact", "Contact rule: (default=1)\n"
-        		"  0= Consider all intra-loop contacts, i.e. all contacts involving only loop (pseudo)atoms (loop vs. loop).\n"
-        		"  1= Consider all contacts involving any loop (pseudo)atom (both loop vs. loop and loop vs. neighborhood).\n",false,1,"int");
-        cmd.add( Contact );
+		ValueArg<int> Contact("C","contact", "Contact rule: (default=1)\n"
+				"  0= Consider all intra-loop contacts, i.e. all contacts involving only loop (pseudo)atoms (loop vs. loop).\n"
+				"  1= Consider all contacts involving any loop (pseudo)atom (both loop vs. loop and loop vs. neighborhood).\n",false,1,"int");
+		cmd.add( Contact );
 
-        ValueArg<int> Potential("P","potential", "Pairwise interaction potential: (default=0)\n"
-        		"  0= Sigmoid function (= k/(1+(x/x0)^p), if x < c, else k=0).\n"
-        		"  1= Tirion's cutoff (= k, if x < c, else k=0).\n"
-        		"  4= edNMA formalism (CA-model only).\n"
-        		"  By default an extra torsional potential will be added.",false,0,"int");
-        cmd.add( Potential );
+		ValueArg<int> Potential("P","potential", "Pairwise interaction potential: (default=0)\n"
+				"  0= Sigmoid function (= k/(1+(x/x0)^p), if x < c, else k=0).\n"
+				"  1= Tirion's cutoff (= k, if x < c, else k=0).\n"
+				"  4= edNMA formalism (CA-model only).\n"
+				"  By default an extra torsional potential will be added.",false,0,"int");
+		cmd.add( Potential );
 
 		SwitchArg NoAnchors("","noanchors", "Anchors not present in loops Multi-PDB. By default anchors should be found in loops Multi-PDB. (default=disabled)", false);
 		cmd.add( NoAnchors );
 
 		ValueArg<std::string> Loops("l","loops", "Loops Multi-PDB suffix. Either use \"_rasp.pdb\" suffix to work with RCD generated loops in Multi-run mode, or loops Multi-PDB file name for Single-run mode. Each loop coordinates will be pasted into the main PDB file to perform calculations. (default=none).",false,"none","string");
-        cmd.add( Loops );
+		cmd.add( Loops );
 
 		SwitchArg AliFlanks("","aliflanks", "Enable flanks alignment. (default=disabled)", false);
 		cmd.add( AliFlanks );
 
 		ValueArg<int> NFlanks("","flanks", "Number of loop flanking residues. E.g. \"2\" means two flanking residues at Nt and other two at Ct, \"0\" means disabled (default=0).",false,0,"int");
-        cmd.add( NFlanks );
+		cmd.add( NFlanks );
 
 		ValueArg<float> dRMSD("","drmsd", "RMSD increment (Delta-RMSD) to save a sample in mode-following strategies (default disabled).",false,999999,"float");
-        cmd.add( dRMSD );
+		cmd.add( dRMSD );
 
 		ValueArg<float> RMSD("r","rmsd", "Target RMSD for mode-following strategies (default=2).",false,2.0,"float");
-        cmd.add( RMSD );
+		cmd.add( RMSD );
 
 		ValueArg<int> NSamples("","ns", "Number of samples for selected strategy (default=1000).",false,1000,"int");
-        cmd.add( NSamples );
+		cmd.add( NSamples );
 
-        ValueArg<int> Strategy("s","strategy", "Sampling strategy (0=selected \"i\"-th mode-following sampling, 1= Single-NMA Monte-Carlo, 2= Radial-Mode-Following sampling based on target RMSD, 3= hyper-square sampling) (default=0).",false,0,"int");
-        cmd.add( Strategy );
+		ValueArg<int> Strategy("s","strategy","Sampling strategy direction (default=2)\n"
+				"    0= Single mode direction defined by -i\n"
+				"    1= Random contribution of all the modes\n"
+				"    2= Mutiple sampling S=1 --ns times\n"
+				"    2= Mode following if morphing\n"
+				,false,0,"int");
+		cmd.add( Strategy );
 
-        ValueArg<std::string> Target("t","target", "Set target PDB file name to enable morphing (default=none).",false,"none","string");
-        cmd.add( Target );
+		ValueArg<std::string> Target("t","target", "Set target PDB file name to enable morphing (default=none).",false,"none","string");
+		cmd.add( Target );
 
-        SwitchArg MC("","mc", "Enable Monte-Carlo stuff. (default=disabled).", true);
-        cmd.add( MC );
+		SwitchArg MR("","mc", " Multiple random mdoe directtions.", true);
+		cmd.add( MR );
 
-        ValueArg<std::string> Name("o","name", "Output files basename (default=ilmode).",false,prog,"string");
-        cmd.add( Name );
+		ValueArg<std::string> Name("o","name", "Output files basename (default=ilmode).",false,prog,"string");
+		cmd.add( Name );
 
-        ValueArg<int> Model("m","model", "Coarse-Grained model: 0=CA, 1=C5, 2=Heavy-Atom (default=2).",false,2,"int");
-        cmd.add( Model );
+		ValueArg<int> Model("m","model", "Coarse-Grained model: 0=CA, 1=C5, 2=Heavy-Atom (default=2).",false,2,"int");
+		cmd.add( Model );
 
 		ValueArg<char> Chain2("","chain2", "Chain ID for the target PDB (default=first chain)",false,1,"int");
 		cmd.add( Chain2 );
@@ -536,11 +548,6 @@ int main( int argc, char * argv[] )
 		ValueArg<char> Chain("","chain", "Chain ID for the initial PDB (default=first chain of loops Multi-PDB)",false,1,"int");
 		cmd.add( Chain );
 
-		ValueArg<int> Start("","start","N-terminal loop residue index, first mobile residue (PDB residue index).",false,-1,"int");
-		cmd.add( Start );
-
-        ValueArg<int> End("","end","C-terminal loop residue index, last mobile residue (PDB residue index).",false,-1,"int");
-		cmd.add( End );
 
 
 		// Parse the command line.
@@ -556,8 +563,8 @@ int main( int argc, char * argv[] )
 		start = Start.getValue();
 		loop_end = End.getValue();
 
-		if(Start.isSet() && End.isSet())
-			loop_startend = true; // = true if Start and End residue indices were parsed
+		//		if(Start.isSet() && End.isSet())
+		//			loop_startend = true; // = true if Start and End residue indices were parsed
 
 		if(Chain.isSet())
 			chain = Chain.getValue();
@@ -584,41 +591,48 @@ int main( int argc, char * argv[] )
 
 		// Contacting method parameters
 
-        power = k0_Power.getValue();
+		power = k0_Power.getValue();
 
-        cte_k0 = k0_Cte.getValue();
+		cte_k0 = k0_Cte.getValue();
 
-        x0 = k0_X0.getValue();
+		x0 = k0_X0.getValue();
 
-        cutoff_k0 = k0_Cutoff.getValue();
+		cutoff_k0 = k0_Cutoff.getValue();
 
-        cte_k1 = k1_Cte.getValue();
+		cte_k1 = k1_Cte.getValue();
 
-        cutoff_k1 = k1_Cutoff.getValue();
+		cutoff_k1 = k1_Cutoff.getValue();
 
 		maxang = MaxAng.getValue(); // Maximum angular increment to normalize modes [deg]
 
-    	// Number of eigenvectors to be computed
-        nevec_fact = Nevs.getValue();
-        if(nevec_fact < 0) // checking
-        {
-        	printf("Parser> Error, invalid number of eigenvectors requested (%f)!\nForcing exit!\n",nevec_fact);
-        	exit(1);
-        }
+		// Number of eigenvectors to be computed
+		nevec_fact = Nevs.getValue();
+		if(nevec_fact < 0) // checking
+		{
+			printf("Parser> Error, invalid number of eigenvectors requested (%f)!\nForcing exit!\n",nevec_fact);
+			exit(1);
+		}
 
-        imod = IndexMode.getValue() - 1; // indices must begin in "0"
 
-        verb = Verb.getValue();
+
+		imod = IndexMode.getValue() - 1; // indices must begin in "0"
+
+		if (imod >= (loop_end-start+1)*2-6 ) {
+		fprintf(stderr, "\n Error selected mode %d must < %d\n\n", imod+1, (loop_end-start+1)*2-6);
+		exit(1);
+		}
+
+		verb = Verb.getValue();
 		printf("Parser> Verbose level: %d\n", verb);
 
-        if(Norm.isSet())
-        {
-        	norm_modes = true;
+		if(Norm.isSet())
+		{
+			norm_modes = true;
 			printf("Parser> Normal modes will be normalized into unit vectors.\n");
-        }
+		}
 
 		// Setting model and chi
-    	model = Model.getValue();
+		model = Model.getValue();
 		if(Chi.isSet())
 			type = 2; // phi,chi,psi
 		else
@@ -638,14 +652,19 @@ int main( int argc, char * argv[] )
 			exit(1);
 		}
 
-        mc_switch = MC.isSet(); // Enable Monte-Carlo stuff
+		mr_switch = MR.isSet(); // Enable mutliple random directions
 
-		strategy = Strategy.getValue(); // Sampling strategy (0=raw sampling for selected mode "i", 1= hyper-square sampling, etc...
+		strategy = Strategy.getValue(); // Sampling strategy(0=raw sampling for selected mode "i", 1= hyper-square sampling, etc...
+
+		if (strategy) {
+			mr_switch = true;
+		}
+
 		nsamples = NSamples.getValue(); // Number of samples for selected strategy
 		target_rmsd = RMSD.getValue(); // Target RMSD for mode-following strategies
 		delta_rmsd = dRMSD.getValue(); // Delta RMSD in mode-following strategies
 
-        ali_flanks = AliFlanks.isSet(); // Enables flanks alignment
+		ali_flanks = AliFlanks.isSet(); // Enables flanks alignment
 
 		if( NFlanks.isSet() )
 			nflanks = NFlanks.getValue(); // Number of loop flanking residues (e.g. "2" means two flanking residues at Nt, and other two at Ct)
@@ -660,39 +679,39 @@ int main( int argc, char * argv[] )
 		}
 		else // Random seed (time initialization)
 		{     // Needed to avoid seed repetition between different runs.
-			  FILE *fp;
-			  unsigned char b[4];
-			  int l=0;
-			  if ((fp = fopen("/dev/urandom", "r")) == NULL)
-			  {
-			    fprintf(stderr, "Error! Could not open /dev/urandom for read\n");
-			    exit(2);
-			  }
-			  fread(b,1,4,fp);
-			  l |= b[0] & 0xFF;
-			  l <<= 8;
-			  l |= b[1] & 0xFF;
-			  l <<= 8;
-			  l |= b[2] & 0xFF;
-			  l <<= 8;
-			  l |= b[3] & 0xFF;
-			  seed = (unsigned int) l;
-			  fclose(fp);
+			FILE *fp;
+			unsigned char b[4];
+			int l=0;
+			if ((fp = fopen("/dev/urandom", "r")) == NULL)
+			{
+				fprintf(stderr, "Error! Could not open /dev/urandom for read\n");
+				exit(2);
+			}
+			fread(b,1,4,fp);
+			l |= b[0] & 0xFF;
+			l <<= 8;
+			l |= b[1] & 0xFF;
+			l <<= 8;
+			l |= b[2] & 0xFF;
+			l <<= 8;
+			l |= b[3] & 0xFF;
+			seed = (unsigned int) l;
+			fclose(fp);
 		}
 		printf("Parser> Mersenne Twister's SEED: --seed = %u\n",seed);
 
 		if(DelHeteros.isSet())
-        	delHeteros_switch = true; // Delete heteroatoms
+			delHeteros_switch = true; // Delete heteroatoms
 
 		if(KeepHydrogens.isSet())
 			delHydrogens_switch = false; // Keep hydrogens
 
 		if(KeepWaters.isSet())
-        	delWaters_switch = false; // Keep waters
+			delWaters_switch = false; // Keep waters
 
-        dc = DC.getValue();
-        if(dc <= 0.0)
-        	dc = 0.001;
+		dc = DC.getValue();
+		if(dc <= 0.0)
+			dc = 0.001;
 	}
 	catch ( ArgException& e )
 	{
@@ -721,21 +740,21 @@ int main( int argc, char * argv[] )
 	Conditions *ncac2 = new Conditions();
 	ncac2->add( ncac );
 
-//	// Saving Input Command-Log File
-//	FILE *f_com;
-//	sprintf(text,"%s%s.log",prog,base);
-//	if( !(f_com=(FILE *)fopen(text,"w") ) )
-//	{
-//		printf("Sorry, unable to open LOG FILE: %s\n",text);
-//		exit(1);
-//	}
-//	for(int i=0; i<argc; i++)
-//		fprintf(f_com,"%s ",argv[i]);
-//	if(!already_seed)
-//		fprintf(f_com,"--seed %u\n",seed); // This allows user to carry out again the same run.
-//	fclose(f_com);
-//
-//	sprintf(saved_files,"%s> Com file:                            %35s\n",prog,text);
+	//	// Saving Input Command-Log File
+	//	FILE *f_com;
+	//	sprintf(text,"%s%s.log",prog,base);
+	//	if( !(f_com=(FILE *)fopen(text,"w") ) )
+	//	{
+	//		printf("Sorry, unable to open LOG FILE: %s\n",text);
+	//		exit(1);
+	//	}
+	//	for(int i=0; i<argc; i++)
+	//		fprintf(f_com,"%s ",argv[i]);
+	//	if(!already_seed)
+	//		fprintf(f_com,"--seed %u\n",seed); // This allows user to carry out again the same run.
+	//	fclose(f_com);
+	//
+	//	sprintf(saved_files,"%s> Com file:                            %35s\n",prog,text);
 
 	timerReal timer; // Real timer (independent of parallelization)
 	Residue *res;
@@ -746,16 +765,16 @@ int main( int argc, char * argv[] )
 	init_aminoacids();
 
 	inputdata *input = NULL;
-//	if( !(input = (inputdata*) malloc( sizeof(inputdata) * 1 ))) // Allocate just one element (later realloc)
-//	{
-//		printf("Sorry, unable to allocate memory!!!\n");
-//		exit(1);
-//	}
+	//	if( !(input = (inputdata*) malloc( sizeof(inputdata) * 1 ))) // Allocate just one element (later realloc)
+	//	{
+	//		printf("Sorry, unable to allocate memory!!!\n");
+	//		exit(1);
+	//	}
 
 	// Selecting Single- or Multiple- run modes
 	int npdbs = 0; // Total number of cases to be processed (1 by default)
-//	char **pdbnames = NULL; // List of PDBs for Multiple Run mode
-//	char *currentloops; // Current Loops filename
+	//	char **pdbnames = NULL; // List of PDBs for Multiple Run mode
+	//	char *currentloops; // Current Loops filename
 	if(strncmp(file_pdb + strlen(file_pdb)-4, ".txt", 4) == 0)
 	{
 		fprintf(stdout,"MULTIPLE RUN MODE (%s has .txt extension)\n",file_pdb);
@@ -826,7 +845,7 @@ int main( int argc, char * argv[] )
 		printf("%s> %2d %8s %8d %8d %c\n", prog, p+1, input[p].fname, input[p].start, input[p].end, input[p].chain);
 	}
 
-// exit(0);
+	// exit(0);
 
 
 	// Process all input PDBs in single (npdbs=1) or multiple run (npdbs>1) modes
@@ -837,8 +856,8 @@ int main( int argc, char * argv[] )
 		float rmsd; // Current RMSD
 
 		// Generate basename for current "p"
-//		strcpy(name,base); // Overwrite previous "name" with the general "base"
-//		strncat(name, input[p].fname, strlen(input[p].fname) - 4); // Concatenate without extension and dot
+		//		strcpy(name,base); // Overwrite previous "name" with the general "base"
+		//		strncat(name, input[p].fname, strlen(input[p].fname) - 4); // Concatenate without extension and dot
 		int len = strlen(input[p].fname) - 4;
 		strncpy(name, input[p].fname, len); // Concatenate without extension and dot
 		name[len] = '\0'; // mandatory...
@@ -872,7 +891,7 @@ int main( int argc, char * argv[] )
 		molr->info(stdout);
 
 		// Formating Initial PDB first
-		if(verb > 0)
+		if(verb > 1)
 			printf( "%s> Formatting residues order and checking for missing atoms\n", prog );
 		if(molr->format_residues(false,model) > 0)
 		{
@@ -920,7 +939,7 @@ int main( int argc, char * argv[] )
 			molr2->info(stdout);
 
 			// Formating TARGET PDB first
-			if(verb > 0)
+			if(verb > 1)
 				printf( "%s> Formatting residues order and checking for missing atoms\n", prog );
 			if(molr2->format_residues(false,model) > 0)
 			{
@@ -1058,10 +1077,10 @@ int main( int argc, char * argv[] )
 		{
 		case 0:
 		case 3:
-//			properCA(mol,&props,&unat);
-//			if(morph_switch)
-//				properCA(mol2,&props2,&unat2);
-//			break;
+			//			properCA(mol,&props,&unat);
+			//			if(morph_switch)
+			//				properCA(mol2,&props2,&unat2);
+			//			break;
 		case 1:
 		case 2:
 			properMFA(mol,&props,&unat,type,model);
@@ -1144,8 +1163,8 @@ int main( int argc, char * argv[] )
 				ch = iter_loops->get_chain();
 				chain = ch->getName()[0];
 			}
-//			fprintf(stderr,"chain= %c\n",chain);
-//			exit(0);
+			//			fprintf(stderr,"chain= %c\n",chain);
+			//			exit(0);
 
 			// Get anchor residue indices from first loop in the Multi-PDB file
 			pdbIter *iter_seg;
@@ -1195,14 +1214,14 @@ int main( int argc, char * argv[] )
 			// Setting indices of first and last mobile residues of loop
 			start = ri+1; // Residue PDB index of first mobile residue
 			loop_end = rf-1; // Residue PDB index of last mobile residue
-//			if(anchors_present) // If anchors are not present in loops, indices must be modified
-//			{
-//			}
-//			else
-//			{
-//				start = ri; // Residue PDB index of first mobile residue
-//				loop_end = rf; // Residue PDB index of last mobile residue
-//			}
+			//			if(anchors_present) // If anchors are not present in loops, indices must be modified
+			//			{
+			//			}
+			//			else
+			//			{
+			//				start = ri; // Residue PDB index of first mobile residue
+			//				loop_end = rf; // Residue PDB index of last mobile residue
+			//			}
 		}
 		// END of loops multi-pdb stuff...
 
@@ -1475,11 +1494,19 @@ int main( int argc, char * argv[] )
 		if(props[ifr + reglen].nan != 1) // If not Proline
 			size++; // considering Ct-anchor Phi angle? (If Ct-anchor is Proline it does not have Phi)
 
+		if (imod >= (reglen)*2-6 ) {
+				fprintf(stderr, "\n Error selected mode %d must < %d --> Pro inside the loop \n\n", imod+1, (reglen)*2-6);
+				exit(1);
+		}
+
+
+
 		int nco = 6; // Number of (scalar) constraints
 		printf("%s> Number of residues in loop: %d\n", prog, reglen);
 		printf("%s> Number of pseudo-atoms in loop: %d\n", prog, num_atoms_loop);
 		printf("%s> Number of constraints: %d\n", prog, nco);
 		printf("%s> Number of free variables in loop: %d\n", prog, size);
+
 
 		// Get masses array for eigenvector normalization
 		float *masses_loop = NULL;
@@ -1490,6 +1517,7 @@ int main( int argc, char * argv[] )
 		twid *decint2 = NULL; // Contacts data structure
 
 		// Number of eigenvectors to be computed (we need to know "size" first)
+
 		if(nevec_fact == 0.0) // all modes requested
 		{
 			nevec = size - nco;
@@ -1533,10 +1561,10 @@ int main( int argc, char * argv[] )
 		masses = get_masses(iter,num_atoms);
 
 		// Set name for trajectory file
-//		if(linear_switch)
-//			sprintf(file_movie,"%s_linear%02d.pdb", name, imod+1);
-//		else
-//			sprintf(file_movie,"%s_dihedral%02d.pdb", name, imod+1);
+		//		if(linear_switch)
+		//			sprintf(file_movie,"%s_linear%02d.pdb", name, imod+1);
+		//		else
+		//			sprintf(file_movie,"%s_dihedral%02d.pdb", name, imod+1);
 		sprintf(file_movie,"%s_traj.pdb", name);
 		sprintf(file_final,"%s_final.pdb", name); // Morphed PDB structure file name
 
@@ -1568,10 +1596,10 @@ int main( int argc, char * argv[] )
 		float *coordx = (float *) malloc( sizeof(float) * num_atoms_loop * 3 ); // for future copy & paste loop coordinates
 
 		float *coord2; // (pseudo)atomic coordinates single row vector
-//		if(morph_switch && scoring == 2)
+		//		if(morph_switch && scoring == 2)
 		if(morph_switch)
 		{
-			if(verb > 0)
+			if(verb > 1)
 				fprintf(stdout, "%s> Getting Target PDB coordinates in single row format (pseudo-atom model)\n", prog);
 			mol2->coordMatrix( &coord2 );
 		}
@@ -1581,15 +1609,15 @@ int main( int argc, char * argv[] )
 		{
 			// fprintf(stdout,"Loop stuff %d of %d, num_atoms_loop= %d, ifr= %d  ilr= %d  chain= %c\n", l, nloops, num_atoms_loop, ifr, ilr, chain);
 
-//			mol->writePDB("mol0.pdb");
-//			molini->writePDB("molini0.pdb");
-//			loops->writePDB("loops0.pdb");
+			//			mol->writePDB("mol0.pdb");
+			//			molini->writePDB("molini0.pdb");
+			//			loops->writePDB("loops0.pdb");
 
 			if(loops_switch)
 			{
 				// Get current loop coordinates
 				get_loop_coords(iter_loops, l * num_atoms_loop, num_atoms_loop, coordx);
-//				get_loop_coords(iterini, ifa, num_atoms_loop, coordx);
+				//				get_loop_coords(iterini, ifa, num_atoms_loop, coordx);
 
 				// Set initial loop coordinates to prevent unwanted distortions
 				set_loop_coords(itermol, ifa, num_atoms_loop, coordx);
@@ -1616,13 +1644,17 @@ int main( int argc, char * argv[] )
 			anchor_drift(iterini, itermol, props, ilr, &adist0, &aang0);
 			printf("%s> Initial anchor distance and angle: %f A and %f deg\n", prog, adist0, aang0);
 
-//			mol->writePDB("mol.pdb");
-//			molini->writePDB("molini.pdb");
-// exit(0);
+			//			mol->writePDB("mol.pdb");
+			//			molini->writePDB("molini.pdb");
+			// exit(0);
 
 			switch (strategy)
 			{
-			case 0: // Raw sampling for selected mode "i" and MORPHING
+			//
+			// CASE 0  "i"-th mode-following sampling
+			//
+			case 0: //   single random direction at f=0
+			case 1: // Multiple random direction at f=0
 			{
 				double modref; // Reference vector modulus
 				double modcurr; // Current vector modulus
@@ -1651,16 +1683,16 @@ int main( int argc, char * argv[] )
 						eigvect[i] = 0.0;
 
 					float *coord; // (pseudo)atomic coordinates single row vector
-					if(verb > 0)
+					if(verb > 1)
 						fprintf(stdout, "%s> Getting coordinates single row (pseudo-atom model)\n", prog);
 					mol->coordMatrix( &coord );
 
 					trd *der; // Derivatives
-					if(verb > 0)
+					if(verb > 1)
 						fprintf(stdout, "%s> Computing derivatives...\n", prog);
 					der = drdqC5x(coord, props, ifr, ilr, num_atoms_loop, size, model);
 
-					if(verb > 0)
+					if(verb > 1)
 						fprintf(stdout, "%s> Computing Kinetic Energy matrix (masses matrix)...\n", prog);
 					mass_matrix = kineticC5x(der, masses, props, ifr, num_atoms_loop, size, nco);
 
@@ -1729,10 +1761,8 @@ int main( int argc, char * argv[] )
 						nipa = nipa2;
 						break;
 					}
-
 					case 1:
 						break;
-
 					default:
 						printf("%s> Please, introduce a valid Contact method to continue!!!\n\nForcing exit!\n\n", prog);
 						exit(1);
@@ -1740,22 +1770,24 @@ int main( int argc, char * argv[] )
 					}
 
 					// IPAs checking
-					if(verb > 0 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
+					if(verb > 1 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
 						for(int i=0; i<nipa; i++)
 							printf("ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
 
-					if(verb > 0)
+
+					// HESSIAN
+					if(verb > 1)
 						fprintf(stdout, "%s> Computing Hessian matrix (potential energy matrix)...\n", prog);
 					hess_matrix = hessianC5x(coord, der, props, decint, nipa, ifr, num_atoms_loop, size, nco);
-//					if(scoring != 2) // "coord" required for Dihedrals RMSD
-//						free(coord);
+					//					if(scoring != 2) // "coord" required for Dihedrals RMSD
+					//						free(coord);
 
 					// Show Hessian matrix
-					if(verb > 0)
+					if(verb > 1)
 						show_matrix(hess_matrix, size + nco, "Hessian:", " %7.2f");
 
 					// Show Kinetic Energy matrix
-					if(verb > 0)
+					if(verb > 1)
 						show_matrix(mass_matrix, size + nco, "Kinetic:", " %7.0f");
 
 					// COMPUTING THE EIGENVECTORS AND EIGENVALUES
@@ -1777,7 +1809,7 @@ int main( int argc, char * argv[] )
 						exit(1);
 					}
 
-					if(verb > 0)
+					if(verb > 1)
 					{
 						printf("%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
 						show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
@@ -1788,7 +1820,7 @@ int main( int argc, char * argv[] )
 					if(maxang != 0.0)
 					{
 						scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
-						if(verb > 0)
+						if(verb > 1)
 							show_vectors(stdout,eigvect,size,neig,"Dumping Scaled Eigenvectors:", " %5.2e");
 					}
 
@@ -1803,8 +1835,8 @@ int main( int argc, char * argv[] )
 					}
 					free(der); // Free obsolete derivatives
 
-//					fprintf(stderr,"size= %d  nlrs= %d\n",size,nlrs);
-//					exit(0);
+					//					fprintf(stderr,"size= %d  nlrs= %d\n",size,nlrs);
+					//					exit(0);
 
 					// Store reference mode "refmode" to maintain the requested direction
 					if(morph_switch) // Morphing
@@ -1813,17 +1845,17 @@ int main( int argc, char * argv[] )
 						{
 						case 1: // Atomic RMSD scoring
 						{
-//							// MON: testing
-//							loop_dihedrals(coord, props, ifr, ilr, size, model, type, &dhs); // Get dihedral angles arrays
-//							show_vector(stderr, dhs, size, "dhs: ", " %6.1f");
-//							loop_dihedrals(coord2, props2, ifr2, ilr2, size, model, type, &dhs2);
-//							show_vector(stderr, dhs2, size, "dhs2:", " %6.1f");
-//							// Element-wise difference between dihedral angle [deg] arrays "v" and "w" (d = v - w) taking into account rotation
-//							dihedrals_diff(dhs2, dhs, refmode, size); // Element-wise difference between vectors "v" and "w" (d = v - w)
-//							show_vector(stderr, refmode, size, "ref: ", " %6.1f");
-//							modref = vector_modulus( refmode, size ); // Reference vector modulus
-//							rmsd = vector_rmsd(refmode, size);
-//							fprintf(stderr,"dihedral_diff_module= %f  dihedral_rmsd= %f\n",modref,rmsd);
+							//							// MON: testing
+							//							loop_dihedrals(coord, props, ifr, ilr, size, model, type, &dhs); // Get dihedral angles arrays
+							//							show_vector(stderr, dhs, size, "dhs: ", " %6.1f");
+							//							loop_dihedrals(coord2, props2, ifr2, ilr2, size, model, type, &dhs2);
+							//							show_vector(stderr, dhs2, size, "dhs2:", " %6.1f");
+							//							// Element-wise difference between dihedral angle [deg] arrays "v" and "w" (d = v - w) taking into account rotation
+							//							dihedrals_diff(dhs2, dhs, refmode, size); // Element-wise difference between vectors "v" and "w" (d = v - w)
+							//							show_vector(stderr, refmode, size, "ref: ", " %6.1f");
+							//							modref = vector_modulus( refmode, size ); // Reference vector modulus
+							//							rmsd = vector_rmsd(refmode, size);
+							//							fprintf(stderr,"dihedral_diff_module= %f  dihedral_rmsd= %f\n",modref,rmsd);
 
 							// Use the atomic coordinates "delta" vector as reference
 							delta_loop(itermol, itertar, ifa, num_atoms_loop, refmode, ifa2); // Compute "delta" vector between both conformations
@@ -1833,10 +1865,10 @@ int main( int argc, char * argv[] )
 
 						case 2: // Dihedral angles RMSD scoring
 						{
-//							loop_dihedrals(itermol, ifr, nlrs, &dhs); // Get dihedral angles arrays
-//							loop_dihedrals(itertar, ifr2, nlrs, &dhs2);
-//							vector_diff(dhs, dhs2, refmode, nlrs*2); // Element-wise difference between vectors "v" and "w" (d = v - w)
-//							modref = vector_modulus( refmode, nlrs*2 ); // Reference vector modulus
+							//							loop_dihedrals(itermol, ifr, nlrs, &dhs); // Get dihedral angles arrays
+							//							loop_dihedrals(itertar, ifr2, nlrs, &dhs2);
+							//							vector_diff(dhs, dhs2, refmode, nlrs*2); // Element-wise difference between vectors "v" and "w" (d = v - w)
+							//							modref = vector_modulus( refmode, nlrs*2 ); // Reference vector modulus
 
 							loop_dihedrals(coord, props, ifr, ilr, size, model, type, &dhs); // Get dihedral angles arrays
 							show_vector(stderr, dhs, size, "dhs: ", " %6.1f");
@@ -1854,7 +1886,7 @@ int main( int argc, char * argv[] )
 						}
 						}
 					}
-					else if(mc_switch) // Monte-Carlo
+					else if(mr_switch) // Monte-Carlo
 					{
 						//				// Generate some random vector in CC
 						//				for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
@@ -1937,8 +1969,8 @@ int main( int argc, char * argv[] )
 					}
 					}
 
-//					fprintf(stderr,"nevec/2 = %d  nevec= %d\n",nevec/2, nevec);
-//					show_vector(stderr, vdelta, nevec, "", " %7.5f", false, false); //
+					//					fprintf(stderr,"nevec/2 = %d  nevec= %d\n",nevec/2, nevec);
+					//					show_vector(stderr, vdelta, nevec, "", " %7.5f", false, false); //
 
 					// WARNING: these "delta" elements are not "Square-rooted" as "delta"
 					sprintf(dummy, "  %4.2f %4.2f", sum_vector(vdelta, nevec/2), sum_vector(vdelta + (nevec/2), nevec - (nevec/2) )); // Total Delta
@@ -1999,7 +2031,7 @@ int main( int argc, char * argv[] )
 						// mol->writeMPDB(file_movie, f+1); // Dump current conformation (frame) to a Multi-PDB file
 
 						// printf("follow_mode> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", rmsd - last_rmsd, delta_rmsd);
-//						mol->writeMloop(file_movie, f+1, ifr-1, ilr+1, chain);
+						//						mol->writeMloop(file_movie, f+1, ifr-1, ilr+1, chain);
 					}
 
 					// Does some loop atom clash with its environment?
@@ -2017,30 +2049,30 @@ int main( int argc, char * argv[] )
 					{
 						switch(scoring)
 						{
-							case 1: // Cartesian coordinates RMSD
-								rmsd = rmsd_loop(itermol, itertar, ifa, num_atoms_loop, ifa2);
+						case 1: // Cartesian coordinates RMSD
+							rmsd = rmsd_loop(itermol, itertar, ifa, num_atoms_loop, ifa2);
 
-//								// MON: testing something
-//								loop_dihedrals(coord, props, ifr, ilr, size, model, type, &dhs); // Get dihedral angles arrays
-//								show_vector(stderr, dhs, size, "dhs: ", " %6.1f");
-//								loop_dihedrals(coord2, props2, ifr2, ilr2, size, model, type, &dhs2);
-//								show_vector(stderr, dhs2, size, "dhs2:", " %6.1f");
-//								// Element-wise difference between dihedral angle [deg] arrays "v" and "w" (d = v - w) taking into account rotation
-//								dihedrals_diff(dhs2, dhs, refmode, size); // Element-wise difference between vectors "v" and "w" (d = v - w)
-//								show_vector(stderr, refmode, size, "ref: ", " %6.1f");
-//								modref = vector_modulus( refmode, size ); // Reference vector modulus
-//								// rmsd = vector_rmsd(refmode, size);
-//								rmsd = modref;
-//								fprintf(stderr,"dihedral_diff_module= %f  dihedral_rmsd= %f\n",modref,rmsd);
+							//								// MON: testing something
+							//								loop_dihedrals(coord, props, ifr, ilr, size, model, type, &dhs); // Get dihedral angles arrays
+							//								show_vector(stderr, dhs, size, "dhs: ", " %6.1f");
+							//								loop_dihedrals(coord2, props2, ifr2, ilr2, size, model, type, &dhs2);
+							//								show_vector(stderr, dhs2, size, "dhs2:", " %6.1f");
+							//								// Element-wise difference between dihedral angle [deg] arrays "v" and "w" (d = v - w) taking into account rotation
+							//								dihedrals_diff(dhs2, dhs, refmode, size); // Element-wise difference between vectors "v" and "w" (d = v - w)
+							//								show_vector(stderr, refmode, size, "ref: ", " %6.1f");
+							//								modref = vector_modulus( refmode, size ); // Reference vector modulus
+							//								// rmsd = vector_rmsd(refmode, size);
+							//								rmsd = modref;
+							//								fprintf(stderr,"dihedral_diff_module= %f  dihedral_rmsd= %f\n",modref,rmsd);
 
-								break;
+							break;
 
-							case 2: // Dihedral angles RMSD
-								// rmsd = rmsd_dihedral_loop(itermol, itertar, ifr, ifr2, ilr-ifr+1, dhs, dhs2);
-								// rmsd = vector_rmsd(dhs, dhs2, size);
-								rmsd = vector_rmsd(refmode, size);
-								// fprintf(stderr,"Dihedral_RMSD= %6.2f\n", rmsd);
-								break;
+						case 2: // Dihedral angles RMSD
+							// rmsd = rmsd_dihedral_loop(itermol, itertar, ifr, ifr2, ilr-ifr+1, dhs, dhs2);
+							// rmsd = vector_rmsd(dhs, dhs2, size);
+							rmsd = vector_rmsd(refmode, size);
+							// fprintf(stderr,"Dihedral_RMSD= %6.2f\n", rmsd);
+							break;
 						}
 
 						if(f==0)
@@ -2069,9 +2101,9 @@ int main( int argc, char * argv[] )
 						fprintf(f_log, "%s\n", text); // Dump log info
 
 						// Convergence test
-						//				if(!mc_switch && (rmsd - rmsd_old < rmsd_conv || clashed_loop( itermol, itermol2, ifa, num_atoms_loop, 1.0)))
+						//				if(!mr_switch && (rmsd - rmsd_old < rmsd_conv || clashed_loop( itermol, itermol2, ifa, num_atoms_loop, 1.0)))
 
-						if(!mc_switch && rmsd - rmsd_old < rmsd_conv)
+						if(!mr_switch && rmsd - rmsd_old < rmsd_conv)
 						{
 							sprintf(dummy, "%s> Motion convergence reached! dRMSD = %8f < %8f\n", prog, rmsd-rmsd_old, rmsd_conv);
 							fprintf(f_log, "%s", dummy); // Dump log info
@@ -2079,8 +2111,7 @@ int main( int argc, char * argv[] )
 							break;
 						}
 
-						if(!mc_switch && rmsd > target_rmsd)
-						// if(rmsd > target_rmsd) // MON: check this.... mc? or not?
+						if(rmsd > target_rmsd)
 						{
 							sprintf(dummy, "%s> Motion convergence reached! RMSD = %8f > %8f target_rmsd\n", prog, rmsd, target_rmsd);
 							fprintf(f_log, "%s", dummy); // Dump log info
@@ -2107,7 +2138,10 @@ int main( int argc, char * argv[] )
 						free(cevec); // free obsolete Cartesian modes
 				}
 
+				if(delta_rmsd != 999999)
 				printf("> Final structure dumped into Muli- and final- PDBs dRMSD = %8f > %8f\n", rmsd - last_rmsd, delta_rmsd);
+				else
+					printf("> Final structure dumped into Muli-PDBs dRMSD = %8f\n", rmsd );
 				mol->writeMloop(file_movie, f+1, ifr-1, ilr+1, chain);
 
 				if(morph_switch) // Morphing protocol
@@ -2133,7 +2167,11 @@ int main( int argc, char * argv[] )
 			}
 			break;
 
-			case 1: // Single-NMA Monte Carlo
+			//
+			// CASE 1   Single-NMA Monte Carlo
+			//
+
+			case 999:
 			{
 				// Initialize Eigenvalues
 				for(int i=0; i<size+nco; i++)
@@ -2144,16 +2182,16 @@ int main( int argc, char * argv[] )
 					eigvect[i] = 0.0;
 
 				float *coord; // (pseudo)atomic coordinates single row vector
-				if(verb > 0)
+				if(verb > 1)
 					fprintf(stdout, "%s> Getting coordinates single row (pseudo-atom model)\n", prog);
 				mol->coordMatrix( &coord );
 
 				trd *der; // Derivatives
-				if(verb > 0)
+				if(verb > 1)
 					fprintf(stdout, "%s> Computing derivatives...\n", prog);
 				der = drdqC5x(coord, props, ifr, ilr, num_atoms_loop, size, model);
 
-				if(verb > 0)
+				if(verb > 1)
 					fprintf(stdout, "%s> Computing Kinetic Energy matrix (masses matrix)...\n", prog);
 				mass_matrix = kineticC5x(der, masses, props, ifr, num_atoms_loop, size, nco);
 
@@ -2230,21 +2268,21 @@ int main( int argc, char * argv[] )
 				}
 
 				// IPAs checking
-				if(verb > 0 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
+				if(verb > 1 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
 					for(int i=0; i<nipa; i++)
 						printf("ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
 
-				if(verb > 0)
+				if(verb > 1)
 					fprintf(stdout, "%s> Computing Hessian matrix (potential energy matrix)...\n", prog);
 				hess_matrix = hessianC5x(coord, der, props, decint, nipa, ifr, num_atoms_loop, size, nco);
 				free(coord);
 
 				// Show Hessian matrix
-				if(verb > 0)
+				if(verb > 1)
 					show_matrix(hess_matrix, size + nco, "Hessian:", " %7.2f");
 
 				// Show Kinetic Energy matrix
-				if(verb > 0)
+				if(verb > 1)
 					show_matrix(mass_matrix, size + nco, "Kinetic:", " %7.0f");
 
 				// COMPUTING THE EIGENVECTORS AND EIGENVALUES
@@ -2263,7 +2301,7 @@ int main( int argc, char * argv[] )
 					exit(1);
 				}
 
-				if(verb > 0)
+				if(verb > 1)
 				{
 					printf("%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
 					show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
@@ -2274,7 +2312,7 @@ int main( int argc, char * argv[] )
 				if(maxang != 0.0)
 				{
 					scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
-					if(verb > 0)
+					if(verb > 1)
 						show_vectors(stdout,eigvect,size,neig,"Dumping Scaled Eigenvectors:", " %5.2e");
 				}
 
@@ -2287,7 +2325,7 @@ int main( int argc, char * argv[] )
 				// sprintf(text, "%s_mode%02d.vmd", name, imod+1);
 				// show_cartmode(coord, cevec, props, ifr, num_atoms_loop + 3, text, imod);
 
-				// Monte Carlo stuff...
+				// sampling
 				for(int f = 0; f < nsamples; f++) // Generate N-samples (frames)
 				{
 					// Initialize current "merged" mode
@@ -2343,14 +2381,18 @@ int main( int argc, char * argv[] )
 			}
 			break;
 
-			case 2: // Mode-following walks from initial random merged-modes.
+			//
+			// CASE 2   Mode-following walks from initial random merged-modes.
+			//
+
+			case 2:
 			{
 				trd *der;
 
 				// Compute the eigenvectors/values for some macromolecular loop (Required to define the initial "refmode" each iteration)
 				neig = nma_loop(mol, model, type, props, masses, ifa, ifr, ilr, num_atoms_loop, size, nco, cutoff_k0, eigval, eigvect, &der);
 				fprintf(stderr,"model= %d  type= %d  ifa= %d  ifr= %d  ilr= %d  na= %d  size= %d  nco= %d  cutoff= %f  neig= %d\n", model, type, ifa, ifr, ilr, num_atoms_loop, size, nco, cutoff_k0, neig);
-// exit(0);
+				// exit(0);
 
 				printf("%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
 				// show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
@@ -2360,13 +2402,13 @@ int main( int argc, char * argv[] )
 				if(maxang != 0.0)
 				{
 					scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
-					if(verb > 0)
+					if(verb > 1)
 						show_vectors(stdout,eigvect,size,neig,"Dumping Scaled Eigenvectors:", " %5.2e");
 				}
 
 				// Compute the Cartesian eigenvectors from the Internal Coordinates eigenvectors
 				double *cevec; // Cartesian eigenvectors
-//				masses_loop = NULL;
+				//				masses_loop = NULL;
 				cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3, masses_loop);
 				free(der);
 
@@ -2387,7 +2429,6 @@ int main( int argc, char * argv[] )
 
 				// srand(1867);
 
-				// Monte Carlo like stuff...
 				for(int f = 0; f < nsamples; f++) // Generate N-samples (frames)
 				{
 					// Reset reference mode
@@ -2404,8 +2445,8 @@ int main( int argc, char * argv[] )
 						for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
 							refmode[ k ] += xnm[i] * cevec[i*ncomps + k ];
 					}
-
-					show_vector(stdout,xnm,neig,"xnm:"," %6.3f");
+					if (verb > 0)
+						show_vector(stdout,xnm,neig,"xnm:"," %6.3f");
 					// show_vector(stdout, refmode+12, 12, "refmode0:", " %5.2f", false, true);
 
 					// // Show refmode
@@ -2455,15 +2496,15 @@ int main( int argc, char * argv[] )
 		delete molini;
 		delete molr;
 
-//		if(morph_switch)
-//		{
-//			for(int k=0; k<nevec; k++)
-//
-//			sprintf(dummy, "%s> Morphing: Initial_RMSD= %8f  Final_RMSD= %8f  Delta_RMSD= %8f\n", prog, rmsd0, rmsd, rmsd0 - rmsd);
-//			fprintf(f_log, "%s", dummy); // Dump log info
-//			printf("%s",dummy);
-//			free(coord2);
-//		}
+		//		if(morph_switch)
+		//		{
+		//			for(int k=0; k<nevec; k++)
+		//
+		//			sprintf(dummy, "%s> Morphing: Initial_RMSD= %8f  Final_RMSD= %8f  Delta_RMSD= %8f\n", prog, rmsd0, rmsd, rmsd0 - rmsd);
+		//			fprintf(f_log, "%s", dummy); // Dump log info
+		//			printf("%s",dummy);
+		//			free(coord2);
+		//		}
 
 		fclose(f_log); // close log file
 	}
@@ -3059,14 +3100,14 @@ double *hessianC5x(float *coord, trd *der, tri *props, twid *decint, int nipa, i
 		for(j=0,jsi=0; j<i; j++,jsi+=sizex)
 			hess_matrix[isi+j] = hess_matrix[jsi+i];
 
-//	// Mon: Tip-effect....
-//	for(i=0,isi=0; i<size; i++,isi+=sizex)
-//		hess_matrix[isi+i] += 1e-3;
-//
-//	hess_matrix[sizex*0+0] += 1e3;
-//	hess_matrix[sizex*1+1] += 1e3;
-//	hess_matrix[sizex*(size-2)+size-2] += 1e3;
-//	hess_matrix[sizex*(size-1)+size-1] += 1e3;
+	//	// Mon: Tip-effect....
+	//	for(i=0,isi=0; i<size; i++,isi+=sizex)
+	//		hess_matrix[isi+i] += 1e-3;
+	//
+	//	hess_matrix[sizex*0+0] += 1e3;
+	//	hess_matrix[sizex*1+1] += 1e3;
+	//	hess_matrix[sizex*(size-2)+size-2] += 1e3;
+	//	hess_matrix[sizex*(size-1)+size-1] += 1e3;
 
 	return hess_matrix;
 }
@@ -3287,33 +3328,33 @@ int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hes
 
 			eigval[*neig] = alphar[n] / beta[n];
 
-//			fprintf(stderr,"Eigenvalue %d: %f, ",n,eigval[*neig]);
-//			if(alphai[n]!=0.0)
-//				fprintf(stderr,"alphai %2d is NOT Zero: %f",n,alphai[n]);
+			//			fprintf(stderr,"Eigenvalue %d: %f, ",n,eigval[*neig]);
+			//			if(alphai[n]!=0.0)
+			//				fprintf(stderr,"alphai %2d is NOT Zero: %f",n,alphai[n]);
 
 			nesi = (*neig) * size;
 			nsix = n*sizex;
 			for(j=0; j<size; j++)
 				eigvect[nesi+j] = vr[nsix+j];
 
-//			fprintf(stdout, "Full eigenvector dump:\n");
-//			for(j=0; j<sizex; j++)
-//				fprintf(stdout, " %8.2e", vr[nsix+j]);
-//			fprintf(stdout, " \n");
+			//			fprintf(stdout, "Full eigenvector dump:\n");
+			//			for(j=0; j<sizex; j++)
+			//				fprintf(stdout, " %8.2e", vr[nsix+j]);
+			//			fprintf(stdout, " \n");
 
 			(*neig)++;
 		}
-//		else
-//		{
-//			// MON
-//			if(beta[n]==0.0)
-//				fprintf(stderr,"beta %2d is Zero: %f, ",n,beta[n]);
-//			if(alphai[n]!=0.0)
-//				fprintf(stderr,"alphai %2d is NOT Zero: %f",n,alphai[n]);
-//			if(alphai[n]==0.0)
-//				fprintf(stderr,"alphai %2d is Zero: %f and alphar is: %f",n,alphai[n],alphar[n]);
-//		}
-//		fprintf(stderr,"\n");
+		//		else
+		//		{
+		//			// MON
+		//			if(beta[n]==0.0)
+		//				fprintf(stderr,"beta %2d is Zero: %f, ",n,beta[n]);
+		//			if(alphai[n]!=0.0)
+		//				fprintf(stderr,"alphai %2d is NOT Zero: %f",n,alphai[n]);
+		//			if(alphai[n]==0.0)
+		//				fprintf(stderr,"alphai %2d is Zero: %f and alphar is: %f",n,alphai[n],alphar[n]);
+		//		}
+		//		fprintf(stderr,"\n");
 	}
 
 	// sort by increasing eigenvalue
@@ -3350,49 +3391,49 @@ int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hes
 //*  range of values or a range of indices for the desired eigenvalues.
 void diag_dsygvx(double *hess_matrix,double *mass_matrix,double *eigval, int size, int il, int iu)
 {
-  /* Lapack input/output */
-  char jobz, uplo, range;
-  int  itype, lda, ldb, ldz, lwork, info, *iwork, *ifail, nulo, m, evec_size;
-  double *work,abstol,*p_evec;
+	/* Lapack input/output */
+	char jobz, uplo, range;
+	int  itype, lda, ldb, ldz, lwork, info, *iwork, *ifail, nulo, m, evec_size;
+	double *work,abstol,*p_evec;
 
-  itype=1;   /* specifies A*x = lambda*B*x */
-  jobz='V';  /* Compute eigenvalues and eigenvectors */
-  range='I'; // 'I': the IL-th through IU-th eigenvalues will be found.
-  uplo='U';  /* Upper triangle of A is stored */
-  lda=size;
-  ldb=size;
-  ldz=size;
-  abstol=0;
-  lwork = 2*size*size+6*size+1;
-  work = (double *) malloc(lwork * sizeof(double));
-  for(int i=0; i<lwork; i++) work[i]=0.0;
+	itype=1;   /* specifies A*x = lambda*B*x */
+	jobz='V';  /* Compute eigenvalues and eigenvectors */
+	range='I'; // 'I': the IL-th through IU-th eigenvalues will be found.
+	uplo='U';  /* Upper triangle of A is stored */
+	lda=size;
+	ldb=size;
+	ldz=size;
+	abstol=0;
+	lwork = 2*size*size+6*size+1;
+	work = (double *) malloc(lwork * sizeof(double));
+	for(int i=0; i<lwork; i++) work[i]=0.0;
 
-  iwork = (int *) malloc(5*size * sizeof(int));
-  for(int i=0; i<5*size; i++) iwork[i]=0;
+	iwork = (int *) malloc(5*size * sizeof(int));
+	for(int i=0; i<5*size; i++) iwork[i]=0;
 
-  ifail = (int *) malloc(size * sizeof(int));
-  for(int i=0; i<size; i++) ifail[i]=0;
+	ifail = (int *) malloc(size * sizeof(int));
+	for(int i=0; i<size; i++) ifail[i]=0;
 
-  evec_size = (iu-il+1);
-  p_evec = (double *) malloc( size * evec_size * sizeof(double) );
-  for(int i=0; i<size*evec_size; i++) p_evec[i]=0;
+	evec_size = (iu-il+1);
+	p_evec = (double *) malloc( size * evec_size * sizeof(double) );
+	for(int i=0; i<size*evec_size; i++) p_evec[i]=0;
 
-  // Diagonalization
-  dsygvx_(&itype, &jobz, &range, &uplo, &size, hess_matrix, &lda,
-		  mass_matrix, &ldb, &nulo, &nulo, &il, &iu, &abstol, &m,
-		  eigval, p_evec, &ldz, work, &lwork, iwork,
-          ifail, &info);
+	// Diagonalization
+	dsygvx_(&itype, &jobz, &range, &uplo, &size, hess_matrix, &lda,
+			mass_matrix, &ldb, &nulo, &nulo, &il, &iu, &abstol, &m,
+			eigval, p_evec, &ldz, work, &lwork, iwork,
+			ifail, &info);
 
-  printf("Msg(diag_dsygvx): %d eigenvectors found! info= %d",m,info);
+	printf("Msg(diag_dsygvx): %d eigenvectors found! info= %d",m,info);
 
-  // Outputting as usual... (eigenvectors inside hess_matrix)
-  for(int i=0; i<size*evec_size; i++)
-	  hess_matrix[i] = p_evec[i]; // copying eigenvectors into hess_matrix
+	// Outputting as usual... (eigenvectors inside hess_matrix)
+	for(int i=0; i<size*evec_size; i++)
+		hess_matrix[i] = p_evec[i]; // copying eigenvectors into hess_matrix
 
-  free(p_evec);
-  free(ifail);
-  free(work); // <-- "work" could be allocated only once outside!!!
-  free(iwork); // <-- "iwork" could be allocated only once outside!!!
+	free(p_evec);
+	free(ifail);
+	free(work); // <-- "work" could be allocated only once outside!!!
+	free(iwork); // <-- "iwork" could be allocated only once outside!!!
 }
 
 //SUBROUTINE DSYGVX( ITYPE, JOBZ, RANGE, UPLO, N, A, LDA, B, LDB,
@@ -3651,7 +3692,7 @@ void show_vectors(FILE *f, double *v, int size, int n, char *name, char *fmt)
 // Show a single vector
 void show_vector(FILE *f, double *v, int size, char *name, char *fmt, bool newline, bool newline2)
 {
-//	if(strlen(name) > 0)
+	//	if(strlen(name) > 0)
 	if(newline)
 		fprintf(f,"%s\n",name);
 	else
@@ -3665,7 +3706,7 @@ void show_vector(FILE *f, double *v, int size, char *name, char *fmt, bool newli
 // Show a single vector (float)
 void show_vector(FILE *f, float *v, int size, char *name, char *fmt, bool newline, bool newline2)
 {
-//	if(strlen(name) > 0)
+	//	if(strlen(name) > 0)
 	if(newline)
 		fprintf(f,"%s\n",name);
 	else
@@ -4055,12 +4096,12 @@ bool clashed_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, float cut2)
 			if(d2 <= cut2)
 				return true;
 
-//			if( (d2 = powf(pos2[0] - pos[0], 2)) <= cut2)
-//				return true;
-//			if( (d2 += powf(pos2[1] - pos[1], 2)) <= cut2)
-//				return true;
-//			if( (d2 += powf(pos2[2] - pos[2], 2)) <= cut2)
-//				return true;
+			//			if( (d2 = powf(pos2[0] - pos[0], 2)) <= cut2)
+			//				return true;
+			//			if( (d2 += powf(pos2[1] - pos[1], 2)) <= cut2)
+			//				return true;
+			//			if( (d2 += powf(pos2[2] - pos[2], 2)) <= cut2)
+			//				return true;
 		}
 
 		for( iter2->pos_atom = ifpa + nla; !iter2->gend_atom(); iter2->next_atom()) // just screen right-side of environment
@@ -4072,19 +4113,19 @@ bool clashed_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, float cut2)
 
 			if(d2 <= cut2)
 				return true;
-//d2 =+ d2;
+			//d2 =+ d2;
 
-//			d2 = powf(pos2[0] - pos[0], 2);
-//			if( d2 <= cut2 )
-//				return true;
-//
-//			d2 += powf(pos2[1] - pos[1], 2);
-//			if( d2 <= cut2 )
-//				return true;
-//
-//			d2 += powf(pos2[2] - pos[2], 2);
-//			if( d2 <= cut2)
-//				return true;
+			//			d2 = powf(pos2[0] - pos[0], 2);
+			//			if( d2 <= cut2 )
+			//				return true;
+			//
+			//			d2 += powf(pos2[1] - pos[1], 2);
+			//			if( d2 <= cut2 )
+			//				return true;
+			//
+			//			d2 += powf(pos2[2] - pos[2], 2);
+			//			if( d2 <= cut2)
+			//				return true;
 		}
 
 		for( iter2->pos_atom = iter->pos_atom + 1; iter2->pos_atom < ifpa + nla - 1; iter2->next_atom()) // loop vs. loop (non-redundant)
@@ -4097,12 +4138,12 @@ bool clashed_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, float cut2)
 			if(d2 <= cut2)
 				return true;
 
-//			if( (d2 = powf(pos2[0] - pos[0], 2)) <= cut2)
-//				return true;
-//			if( (d2 += powf(pos2[1] - pos[1], 2)) <= cut2)
-//				return true;
-//			if( (d2 += powf(pos2[2] - pos[2], 2)) <= cut2)
-//				return true;
+			//			if( (d2 = powf(pos2[0] - pos[0], 2)) <= cut2)
+			//				return true;
+			//			if( (d2 += powf(pos2[1] - pos[1], 2)) <= cut2)
+			//				return true;
+			//			if( (d2 += powf(pos2[2] - pos[2], 2)) <= cut2)
+			//				return true;
 		}
 
 	}
@@ -4137,12 +4178,12 @@ bool clashed_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, float cut2, 
 			if(d2 <= cut2)
 				return true;
 
-//			if( (d2 = powf(pos2[0] - pos[0], 2)) <= cut2)
-//				return true;
-//			if( (d2 += powf(pos2[1] - pos[1], 2)) <= cut2)
-//				return true;
-//			if( (d2 += powf(pos2[2] - pos[2], 2)) <= cut2)
-//				return true;
+			//			if( (d2 = powf(pos2[0] - pos[0], 2)) <= cut2)
+			//				return true;
+			//			if( (d2 += powf(pos2[1] - pos[1], 2)) <= cut2)
+			//				return true;
+			//			if( (d2 += powf(pos2[2] - pos[2], 2)) <= cut2)
+			//				return true;
 		}
 
 		for( iter2->pos_atom = ifpa2 + nla; !iter2->gend_atom(); iter2->next_atom()) // just screen right-side of environment
@@ -4154,19 +4195,19 @@ bool clashed_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, float cut2, 
 
 			if(d2 <= cut2)
 				return true;
-//d2 =+ d2;
+			//d2 =+ d2;
 
-//			d2 = powf(pos2[0] - pos[0], 2);
-//			if( d2 <= cut2 )
-//				return true;
-//
-//			d2 += powf(pos2[1] - pos[1], 2);
-//			if( d2 <= cut2 )
-//				return true;
-//
-//			d2 += powf(pos2[2] - pos[2], 2);
-//			if( d2 <= cut2)
-//				return true;
+			//			d2 = powf(pos2[0] - pos[0], 2);
+			//			if( d2 <= cut2 )
+			//				return true;
+			//
+			//			d2 += powf(pos2[1] - pos[1], 2);
+			//			if( d2 <= cut2 )
+			//				return true;
+			//
+			//			d2 += powf(pos2[2] - pos[2], 2);
+			//			if( d2 <= cut2)
+			//				return true;
 		}
 
 		for( iter2->pos_atom = iter->pos_atom + 1 + ifpa2-ifpa; iter2->pos_atom < ifpa2 + nla - 1; iter2->next_atom()) // loop vs. loop (non-redundant)
@@ -4179,12 +4220,12 @@ bool clashed_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, float cut2, 
 			if(d2 <= cut2)
 				return true;
 
-//			if( (d2 = powf(pos2[0] - pos[0], 2)) <= cut2)
-//				return true;
-//			if( (d2 += powf(pos2[1] - pos[1], 2)) <= cut2)
-//				return true;
-//			if( (d2 += powf(pos2[2] - pos[2], 2)) <= cut2)
-//				return true;
+			//			if( (d2 = powf(pos2[0] - pos[0], 2)) <= cut2)
+			//				return true;
+			//			if( (d2 += powf(pos2[1] - pos[1], 2)) <= cut2)
+			//				return true;
+			//			if( (d2 += powf(pos2[2] - pos[2], 2)) <= cut2)
+			//				return true;
 		}
 
 	}
@@ -4251,22 +4292,22 @@ void dihedrals_diff(float *v, float *w, double *d, int size)
 	{
 		d[i] = v[i] - w[i];
 
-//		if( fabs(d[i]) > 180 )
-//		{
-//			if(d[i] >= 180)
-//				d[i] = w[i] - v[i];
-//			else if(d[i] < 180)
-//				d[i] = w[i] - v[i];
-////				d[i] += 180;
-//		}
+		//		if( fabs(d[i]) > 180 )
+		//		{
+		//			if(d[i] >= 180)
+		//				d[i] = w[i] - v[i];
+		//			else if(d[i] < 180)
+		//				d[i] = w[i] - v[i];
+		////				d[i] += 180;
+		//		}
 
-//		if( fabs(d[i]) > 180 )
-//		{
-//			if(d[i] >= 180)
-//				d[i] = -(d[i]- 180);
-//			else if(d[i] < 180)
-//				d[i] = -(d[i] + 180);
-//		}
+		//		if( fabs(d[i]) > 180 )
+		//		{
+		//			if(d[i] >= 180)
+		//				d[i] = -(d[i]- 180);
+		//			else if(d[i] < 180)
+		//				d[i] = -(d[i] + 180);
+		//		}
 
 		if( fabs(d[i]) > 180 )
 		{
@@ -4490,75 +4531,75 @@ void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu,
 
 		// CHI (3BB2R)
 		// Note that "resn" is available, you can check numerically Aminoacid identities!!! (faster)
-//		if( type == 2 )
-			if( props[iter->pos_fragment].nan == 3 )
-				//				if( (props[iter->pos_fragment].nan==3 && iter->pos_fragment != ilr) ||
-				//						(props[iter->pos_fragment].nan==2 &&
-				//								(iter->pos_fragment==0 ||
-				//										(iter->pos_fragment==num_res-1 && model==1) ) ) )
+		//		if( type == 2 )
+		if( props[iter->pos_fragment].nan == 3 )
+			//				if( (props[iter->pos_fragment].nan==3 && iter->pos_fragment != ilr) ||
+			//						(props[iter->pos_fragment].nan==2 &&
+			//								(iter->pos_fragment==0 ||
+			//										(iter->pos_fragment==num_res-1 && model==1) ) ) )
+		{
+			// Rotate CHI
+			// Computing axis
+			if(model==2)
+				iter_res_atom->pos_atom = 4; // CB full-atom
+			else
+				iter_res_atom->pos_atom = 3; // CB 3bb2r
+			( iter_res_atom->get_atom() )->getPosition( co ); // CB position (R) (further needed: Qi)
+			iter_res_atom->pos_atom = 1; // CA
+			( iter_res_atom->get_atom() )->getPosition( ca ); // CA position
+			e1[0] = co[0] - ca[0]; // e1 ==> vector CA-->CB (P-->Q)
+			e1[1] = co[1] - ca[1];
+			e1[2] = co[2] - ca[2];
+
+			// Computing CHI rotation matrix given "e1" (O-->Y) and the current "chi" angle
+			rotmat(uu[j2] * step, e1, Ri);
+			// d_rotmat(uu[j2] * step / (float) maxrot, e1, Ri);
+
+			if(debug)
+				printf("%4d CHI (Updating Ti & Si) angle[%3d]= %f\n",j,j2,uu[j2]*step);
+
+			// NOT-Updating acummulated rotation matrix (Si). (Rotational part of Mi)
+			// We will rotate CHI after PHI rotation-traslation is applied!
+			// ( We are moveing just one atom: O )
+
+			// translating to the origin the Translational part of M due to rotation
+			T[0] = - co[0]; // T = -CB-position
+			T[1] = - co[1];
+			T[2] = - co[2];
+			// Rotating the "rotation origin position" -->
+			// Ri x T = Ti (Applies a rotation to a position vector)
+			multvec3(Ri, T, nh);
+			nh[0] += co[0];
+			nh[1] += co[1];
+			nh[2] += co[2];
+
+			// Move CHI
+			if(model==2)
 			{
-				// Rotate CHI
-				// Computing axis
-				if(model==2)
-					iter_res_atom->pos_atom = 4; // CB full-atom
-				else
-					iter_res_atom->pos_atom = 3; // CB 3bb2r
-				( iter_res_atom->get_atom() )->getPosition( co ); // CB position (R) (further needed: Qi)
-				iter_res_atom->pos_atom = 1; // CA
-				( iter_res_atom->get_atom() )->getPosition( ca ); // CA position
-				e1[0] = co[0] - ca[0]; // e1 ==> vector CA-->CB (P-->Q)
-				e1[1] = co[1] - ca[1];
-				e1[2] = co[2] - ca[2];
-
-				// Computing CHI rotation matrix given "e1" (O-->Y) and the current "chi" angle
-				rotmat(uu[j2] * step, e1, Ri);
-				// d_rotmat(uu[j2] * step / (float) maxrot, e1, Ri);
-
-				if(debug)
-					printf("%4d CHI (Updating Ti & Si) angle[%3d]= %f\n",j,j2,uu[j2]*step);
-
-				// NOT-Updating acummulated rotation matrix (Si). (Rotational part of Mi)
-				// We will rotate CHI after PHI rotation-traslation is applied!
-				// ( We are moveing just one atom: O )
-
-				// translating to the origin the Translational part of M due to rotation
-				T[0] = - co[0]; // T = -CB-position
-				T[1] = - co[1];
-				T[2] = - co[2];
-				// Rotating the "rotation origin position" -->
-				// Ri x T = Ti (Applies a rotation to a position vector)
-				multvec3(Ri, T, nh);
-				nh[0] += co[0];
-				nh[1] += co[1];
-				nh[2] += co[2];
-
-				// Move CHI
-				if(model==2)
+				// With Full-Atom, only atoms after CB move!!!
+				for ( iter_res_atom->pos_atom = 5;
+						!iter_res_atom->gend_atom();
+						iter_res_atom->next_atom()   )
 				{
-					// With Full-Atom, only atoms after CB move!!!
-					for ( iter_res_atom->pos_atom = 5;
-							!iter_res_atom->gend_atom();
-							iter_res_atom->next_atom()   )
-					{
-						atom = (Atom *) iter_res_atom->get_atom();
-						atom->getPosition( tv ) ; // position before rotation
-						rmot(Ri, nh, tv, tvp); // Rigid Motion [ (4x4) x (4x1) matrix multiplication ]
-						atom->setPosition( tvp ) ; // position after rotation
-					}
-				}
-				else
-				{
-					// With 3BB2R, just "O" moves!!!
-					iter_res_atom->pos_atom = 4;
 					atom = (Atom *) iter_res_atom->get_atom();
 					atom->getPosition( tv ) ; // position before rotation
 					rmot(Ri, nh, tv, tvp); // Rigid Motion [ (4x4) x (4x1) matrix multiplication ]
 					atom->setPosition( tvp ) ; // position after rotation
 				}
-
-				j2++;
-				j++;
 			}
+			else
+			{
+				// With 3BB2R, just "O" moves!!!
+				iter_res_atom->pos_atom = 4;
+				atom = (Atom *) iter_res_atom->get_atom();
+				atom->getPosition( tv ) ; // position before rotation
+				rmot(Ri, nh, tv, tvp); // Rigid Motion [ (4x4) x (4x1) matrix multiplication ]
+				atom->setPosition( tvp ) ; // position after rotation
+			}
+
+			j2++;
+			j++;
+		}
 
 		// PSI
 		if( iter->pos_fragment != num_res-1 || model == 2 ) // Segment Last residue never has PSI
@@ -4635,62 +4676,62 @@ void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu,
 // (The "masses", i.e. occupancies, with zero mass will not be accounted for.)
 void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cutoff, twid **p_decint, int *p_nipa)
 {
-  bool debug = false;
-  int nipa, index, k, l;
-  double d2;
-  float cutoff2;
-  cutoff2 = cutoff*cutoff; // to speed-up distance evaluations
-  twid *decint;
-  decint = *p_decint;
-  nipa = 0; // counts the number of interacting pseudo-atom pairs
-  Atom *atA,*atB;
-  Tcoor rA,rB;
-// pdbIter *iterA,*iterB;
-// iterA = new pdbIter(mol);
-// iterB = new pdbIter(mol);
+	bool debug = false;
+	int nipa, index, k, l;
+	double d2;
+	float cutoff2;
+	cutoff2 = cutoff*cutoff; // to speed-up distance evaluations
+	twid *decint;
+	decint = *p_decint;
+	nipa = 0; // counts the number of interacting pseudo-atom pairs
+	Atom *atA,*atB;
+	Tcoor rA,rB;
+	// pdbIter *iterA,*iterB;
+	// iterA = new pdbIter(mol);
+	// iterB = new pdbIter(mol);
 
-  if(debug)
-	  printf("Msg(make_ipas_new): Creating Interacting Pairs of pseudo-Atoms (IPAs) list.\n");
+	if(debug)
+		printf("Msg(make_ipas_new): Creating Interacting Pairs of pseudo-Atoms (IPAs) list.\n");
 
-  for(iterA->pos_atom = ifpa; iterA->pos_atom < ifpa + nla; iterA->next_atom() )
-  {
-	  atA = iterA->get_atom();
-	  if(atA->getPdbocc() != 0.0) // if it's not a virtual atom (modified 24/11/2009)
-	  {
-		  atA->getPosition(rA);
-//		  for(iterB->pos_atom = iterA->pos_atom+1; !iterB->gend_atom(); iterB->next_atom() )
-		  for(iterB->pos_atom = 0; !iterB->gend_atom(); iterB->next_atom() )
-		  {
-			  if(iterA->pos_atom >= iterB->pos_atom) // Avoids counting twice intra-loop contacts
-				  continue;
+	for(iterA->pos_atom = ifpa; iterA->pos_atom < ifpa + nla; iterA->next_atom() )
+	{
+		atA = iterA->get_atom();
+		if(atA->getPdbocc() != 0.0) // if it's not a virtual atom (modified 24/11/2009)
+		{
+			atA->getPosition(rA);
+			//		  for(iterB->pos_atom = iterA->pos_atom+1; !iterB->gend_atom(); iterB->next_atom() )
+			for(iterB->pos_atom = 0; !iterB->gend_atom(); iterB->next_atom() )
+			{
+				if(iterA->pos_atom >= iterB->pos_atom) // Avoids counting twice intra-loop contacts
+					continue;
 
-			  atB = iterB->get_atom();
-			  if(atB->getPdbocc() != 0.0)  // if it's not a virtual atom
-			  {
-				  atB->getPosition(rB);
-				  d2 = pow(rA[0]-rB[0],2) + pow(rA[1]-rB[1],2) + pow(rA[2]-rB[2],2);
+				atB = iterB->get_atom();
+				if(atB->getPdbocc() != 0.0)  // if it's not a virtual atom
+				{
+					atB->getPosition(rB);
+					d2 = pow(rA[0]-rB[0],2) + pow(rA[1]-rB[1],2) + pow(rA[2]-rB[2],2);
 
-				  if(d2 <= cutoff2)
-				  {
-					  nipa++; // Counts number of Interacting Pairs of Atoms
-					  decint = ( twid * ) realloc( decint, nipa * sizeof( twid ) ); // resizes contact list-structure
-					  decint[nipa - 1].k = iterA->pos_atom; // k-pseudo-atom index (i-atom index)
-					  decint[nipa - 1].l = iterB->pos_atom; // l-pseudo-atom index (j-atom index)
-					  decint[nipa - 1].d = sqrtf(d2); // set distance
-					  decint[nipa - 1].C = 0.0; // force constant will be set in the future
-				  }
-			  }
-		  }
-	  }
-  }
-//  delete iterA;
-//  delete iterB;
+					if(d2 <= cutoff2)
+					{
+						nipa++; // Counts number of Interacting Pairs of Atoms
+						decint = ( twid * ) realloc( decint, nipa * sizeof( twid ) ); // resizes contact list-structure
+						decint[nipa - 1].k = iterA->pos_atom; // k-pseudo-atom index (i-atom index)
+						decint[nipa - 1].l = iterB->pos_atom; // l-pseudo-atom index (j-atom index)
+						decint[nipa - 1].d = sqrtf(d2); // set distance
+						decint[nipa - 1].C = 0.0; // force constant will be set in the future
+					}
+				}
+			}
+		}
+	}
+	//  delete iterA;
+	//  delete iterB;
 
-  if(debug)
-	  printf( "Msg(make_ipas_loop): Number of Interacting Pairs of pseudo-Atoms (NIPAs): %d\n", nipa );
+	if(debug)
+		printf( "Msg(make_ipas_loop): Number of Interacting Pairs of pseudo-Atoms (NIPAs): %d\n", nipa );
 
-  *p_nipa = nipa; // outputs "nipas"
-  *p_decint = decint;
+	*p_nipa = nipa; // outputs "nipas"
+	*p_decint = decint;
 }
 
 
@@ -4698,24 +4739,24 @@ void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cut
 //	sqrt --> Set "true" to compute the square root of the masses (to mass-weight Cartesian modes), otherwise it just gets the masses
 float *get_masses_loop(pdbIter *iter, int ifpa, int nla, bool sqrt)
 {
-  Atom *at;
-  float *masses = (float *) malloc( sizeof( float ) * nla ); // Allocate memory
+	Atom *at;
+	float *masses = (float *) malloc( sizeof( float ) * nla ); // Allocate memory
 
-  int i;
-  if(sqrt) // The square root of the masses
-	  for(iter->pos_atom = ifpa, i=0; iter->pos_atom < ifpa + nla; iter->next_atom(), i++ )
-	  {
-		  at = iter->get_atom();
-		  masses[i] = sqrtf( at->getPdbocc() );
-	  }
-  else // Just the masses
-	  for(iter->pos_atom = ifpa, i=0; iter->pos_atom < ifpa + nla; iter->next_atom(), i++ )
-	  {
-		  at = iter->get_atom();
-		  masses[i] = at->getPdbocc();
-	  }
+	int i;
+	if(sqrt) // The square root of the masses
+		for(iter->pos_atom = ifpa, i=0; iter->pos_atom < ifpa + nla; iter->next_atom(), i++ )
+		{
+			at = iter->get_atom();
+			masses[i] = sqrtf( at->getPdbocc() );
+		}
+	else // Just the masses
+		for(iter->pos_atom = ifpa, i=0; iter->pos_atom < ifpa + nla; iter->next_atom(), i++ )
+		{
+			at = iter->get_atom();
+			masses[i] = at->getPdbocc();
+		}
 
-  return masses;
+	return masses;
 }
 
 // Creates contacts list (IPA) for some loop (intra-loop + loop vs. environment) from two iterators pointing to the same Macromolecule.
@@ -4860,8 +4901,8 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			fprintf(stderr, "follow_mode> Computing Kinetic Energy matrix (masses matrix)...\n");
 		mass_matrix = kineticC5x(der, masses, props, ifr, na, size, nco);
 
-//		if(decint != NULL)
-//			free(decint); // Free obsolete contacts list
+		//		if(decint != NULL)
+		//			free(decint); // Free obsolete contacts list
 
 		// Allocate "decint" to store the contacts list (ipas-list)
 		if( !(decint = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )  // Required for "realloc"
@@ -4933,7 +4974,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		if(maxang != 0.0)
 		{
 			scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
-			if(verb > 0)
+			if(verb > 1)
 				show_vectors(stderr,eigvect,size,neig,"Dumping Scaled Eigenvectors:", " %5.2e");
 		}
 
@@ -4947,14 +4988,15 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		// show_cartmode(coord, cevec, props, ifr, na + 3, text, imod);
 
 		// Compute modes amplitudes into "alpha" array
-//		double delta = 0.0;
-//		double ddot;
+		//		double delta = 0.0;
+		//		double ddot;
 
-//		show_vector(stdout, refmode, ncomps, "refmode:", " %5.2f", false, true);
+		//		show_vector(stdout, refmode, ncomps, "refmode:", " %5.2f", false, true);
 		// show_vector(stdout, refmode+12, 12, "refmode:", " %5.2f", false, true);
 
-//		sprintf(text,"follow_mode> %4d ", f);
-		fprintf(stdout,"follow_mode> %4d ", f);
+		//		sprintf(text,"follow_mode> %4d ", f);
+		if(verb > 0)
+			fprintf(stdout,"follow_mode> %4d ", f);
 
 		// Compute "alpha": projecting "refmode" vector into "cevec" modal space to obtain "alpha" projection
 		for(int n=0; n<nevec; n++)
@@ -4963,46 +5005,49 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 
 		// Compute "delta" array from "alpha" ("delta" array is the element-wise square of "alpha")
 		pow_vector(alpha, delta, nevec, 2);
-		show_vector(stdout, delta, nevec, "", " %6.4f", false, false);
+		if(verb > 0)
+			show_vector(stdout, delta, nevec, "", " %6.4f", false, false);
 
 		// Compute "delta" value
-		fprintf(stdout, "  %7.5f", sqrt( sum_vector(delta, nevec) ));
 
-//		// Compute and show delta
-//		sprintf(dummy, "  %7.5f", get_delta(alpha, nevec) );
-//		strcat(text, dummy);
-//
-//		for(int n=0; n<nevec; n++)
-//		{
-//			ddot = dotprodnorm( refmode, cevec + n*ncomps, ncomps, modref );
-//			alpha[n] = ddot;
-//			delta += ddot*ddot;
-//			sprintf(dummy, " %7.5f", ddot*ddot);
-//			strcat(text, dummy);
-//		}
-//		sprintf(dummy, "  %7.5f", sqrt(delta));
-//		strcat(text, dummy);
-//
-//		// Initialize current mode
-//		for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
-//			mode[ k ] = 0.0; // zero initialization
-//
-//		double ampn; // Amplitude of n-th mode
-//		for(int n=0; n<nevec; n++)
-//		{
-//			ampn = pow(alpha[n],2); // Amplitude of n-th mode
-//			// fprintf(stderr, "n= %d  ampn= %f\n", n, ampn);
-//
-//			if(alpha[n] < 0.0) // Reverse n-th mode
-//				ampn *= -1.0; // Reverse current CC mode to maintain initial direction
-//
-//			// Generate "merged" Dihedral-coordinates mode for motion
-//			for(int k = 0; k < size; k++) // Mon added the +3, watch out!
-//				mode[ k ] += eigvect[ n * size + k ] * ampn;
-//		}
+		if(verb > 0)
+			fprintf(stdout, "  %7.5f", sqrt( sum_vector(delta, nevec) ));
+
+		//		// Compute and show delta
+		//		sprintf(dummy, "  %7.5f", get_delta(alpha, nevec) );
+		//		strcat(text, dummy);
+		//
+		//		for(int n=0; n<nevec; n++)
+		//		{
+		//			ddot = dotprodnorm( refmode, cevec + n*ncomps, ncomps, modref );
+		//			alpha[n] = ddot;
+		//			delta += ddot*ddot;
+		//			sprintf(dummy, " %7.5f", ddot*ddot);
+		//			strcat(text, dummy);
+		//		}
+		//		sprintf(dummy, "  %7.5f", sqrt(delta));
+		//		strcat(text, dummy);
+		//
+		//		// Initialize current mode
+		//		for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
+		//			mode[ k ] = 0.0; // zero initialization
+		//
+		//		double ampn; // Amplitude of n-th mode
+		//		for(int n=0; n<nevec; n++)
+		//		{
+		//			ampn = pow(alpha[n],2); // Amplitude of n-th mode
+		//			// fprintf(stderr, "n= %d  ampn= %f\n", n, ampn);
+		//
+		//			if(alpha[n] < 0.0) // Reverse n-th mode
+		//				ampn *= -1.0; // Reverse current CC mode to maintain initial direction
+		//
+		//			// Generate "merged" Dihedral-coordinates mode for motion
+		//			for(int k = 0; k < size; k++) // Mon added the +3, watch out!
+		//				mode[ k ] += eigvect[ n * size + k ] * ampn;
+		//		}
 
 		// Compute IC "mode" from "eigvect" IC eigenvectors and "alpha" and "delta" arrays
-//		make_mode(alpha, delta, eigvect, mode, nevec, size);
+		//		make_mode(alpha, delta, eigvect, mode, nevec, size);
 
 		// Using Alpha
 		for(int k = 0; k < size; k++)
@@ -5018,19 +5063,21 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		move_loop_dihedral(itermol, ifr, ilr, props, mode, size, model, 1.0);
 
 		// Does some loop atom clash with its environment?
-//		sprintf(dummy, " %d", clashed_loop( itermol, itermol2, ifa, na, 1.0) );
-//		strcat(text, dummy);
+		//		sprintf(dummy, " %d", clashed_loop( itermol, itermol2, ifa, na, 1.0) );
+		//		strcat(text, dummy);
 
 		if(iterini != NULL)
 		{
 			rmsd = rmsd_loop(iterini, itermol, ifa, na);
-			fprintf(stdout, " %7.4f\n", rmsd);
-//			sprintf(dummy, " %7.4f", rmsd);
-//			strcat(text, dummy);
+			if(verb > 0)
+				fprintf(stdout, " %7.4f\n", rmsd);
+			//			sprintf(dummy, " %7.4f", rmsd);
+			//			strcat(text, dummy);
 
 			// Convergence check
 			if(rmsd > rmsd_conv)
 			{
+
 				printf("follow_mode> Motion convergence reached! dRMSD = %8f > %8f\n", rmsd, rmsd_conv);
 				mol->writeMloop(file_movie, (*p_fi)++, ifr-1, ilr+1, chain);
 				// exit(0);
@@ -5045,28 +5092,28 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 				last_rmsd = rmsd; // Keep last saved RMSD
 			}
 
-//			// Compute anchor drift
-//			anchor_drift(iterini, itermol, props, ilr, &adist, &aang);
-//			ddrift = adist - adist0; // Distance increment wrt. initial distance
-//			adrift = aang - aang0; // Distance increment wrt. initial distance
-//			sprintf(dummy, " %6.3f %5.2f", ddrift, adrift);
-//			strcat(text, dummy);
+			//			// Compute anchor drift
+			//			anchor_drift(iterini, itermol, props, ilr, &adist, &aang);
+			//			ddrift = adist - adist0; // Distance increment wrt. initial distance
+			//			adrift = aang - aang0; // Distance increment wrt. initial distance
+			//			sprintf(dummy, " %6.3f %5.2f", ddrift, adrift);
+			//			strcat(text, dummy);
 
 			// printf("%s\n", text); // Dump all output for current frame
 			// rmsd_old = rmsd;
 		}
 
 		// Convergence test
-		//				if(!mc_switch && (rmsd - rmsd_old < rmsd_conv || clashed_loop( itermol, itermol2, ifa, na, 1.0)))
+		//				if(!mr_switch && (rmsd - rmsd_old < rmsd_conv || clashed_loop( itermol, itermol2, ifa, na, 1.0)))
 
 
-//		printf("%s\n", text); // Dump all output for current frame
-//		fprintf(stdout, "\n");
+		//		printf("%s\n", text); // Dump all output for current frame
+		//		fprintf(stdout, "\n");
 
 		//	Update the "refmode" and "modref" with the current most overlapping mode
 		if(update)
 		{
-//			int nmax = get_max_index(delta, nevec);
+			//			int nmax = get_max_index(delta, nevec);
 
 			for(int i=0; i<ncomps; i++)
 				refmode[i] = 0.0; // reset "refmode"
@@ -5074,12 +5121,12 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			// Update the reference mode "refmode"
 			for(int k=0; k<nevec; k++)
 			{
-//				if(alpha[k] > 0) // same direction
-//					for(int i=0; i<ncomps; i++)
-//						refmode[i] += cevec[ k * ncomps + i ] * delta[k];
-//				else // reversed direction
-//					for(int i=0; i<ncomps; i++)
-//						refmode[i] -= cevec[ k * ncomps + i ] * delta[k];
+				//				if(alpha[k] > 0) // same direction
+				//					for(int i=0; i<ncomps; i++)
+				//						refmode[i] += cevec[ k * ncomps + i ] * delta[k];
+				//				else // reversed direction
+				//					for(int i=0; i<ncomps; i++)
+				//						refmode[i] -= cevec[ k * ncomps + i ] * delta[k];
 
 				for(int i=0; i<ncomps; i++)
 					refmode[i] += cevec[ k * ncomps + i ] * alpha[k];
@@ -5190,7 +5237,7 @@ int nma_loop(Macromolecule *mol, int model, int type, tri *props, float *masses,
 	hess_matrix = hessianC5x(coord, der, props, decint, nipa, ifr, na, size, nco);
 	free(coord);
 	free(decint);
-//	free(der); // Free obsolete derivatives
+	//	free(der); // Free obsolete derivatives
 
 	// Show Hessian matrix
 	if(debug)
@@ -5213,11 +5260,11 @@ int nma_loop(Macromolecule *mol, int model, int type, tri *props, float *masses,
 	//*  and B are assumed to be symmetric and B is also positive definite.
 	//*  Eigenvalues and eigenvectors can be selected by specifying either a
 	//*  range of values or a range of indices for the desired eigenvalues.
-//	int info = 0;
-//	fprintf(stderr,"size= %d\n",size);
-//	diag_dsygvx(hess_matrix, mass_matrix, eigval, size, nco, 1, 17);
-//	show_vectors(stdout,hess_matrix,size,17,"Dumping Raw Eigenvectors:", " %5.2e");
-//exit(0);
+	//	int info = 0;
+	//	fprintf(stderr,"size= %d\n",size);
+	//	diag_dsygvx(hess_matrix, mass_matrix, eigval, size, nco, 1, 17);
+	//	show_vectors(stdout,hess_matrix,size,17,"Dumping Raw Eigenvectors:", " %5.2e");
+	//exit(0);
 
 
 
