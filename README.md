@@ -47,13 +47,14 @@ Also with option -s 2 can move --ns times  diffenrent random modal directions, i
 and you can do it at different rmsds (--rmsd 3.0,--rmsd 3.0).   
 
 <p float="left">
-  <img src="images/rmsd1.jpg" width="100"> 
-  <img src="images/rmsd2.jpg" width="100">
-  <img src="images/rmsd3.jpg" width="100"> 
-  <img src="images/rmsd4.jpg" width="100"> 
-
+  <img src="images/rmsd1.jpg" width="200"> 
+  <img src="images/rmsd2.jpg" width="200">
+  <img src="images/rmsd3.jpg" width="200"> 
+  <img src="images/rmsd4.jpg" width="200"> 
 </p>
 
+
+![](images/rmsd1.jpg "Rmsd 1.0 Å ") ![](images/rmsd2.jpg "Rmsd 1.0 Å ")  ![](images/rmsd3.jpg "Rmsd 1.0 Å ") 
 
 </table>
  <tr width="100">
