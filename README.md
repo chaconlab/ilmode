@@ -44,16 +44,17 @@ Also with option -s 2 can move mutiple times (-ns times) in different random mod
 <pre>
 ../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 1.0  --ns 10 
 </pre>
-and you can do it at different Rmsd cutoffs, i.e,  1.0Å , 3.0Å , 6.0Å  and 9.0 Å:  
+and you can do it at different Rmsd cutoffs, i.e,  1.0Å , 3.0Å , and,  6.0Å:  
 
-Rmsd 1.0 Å                 |Rmsd 3.0 Å                 |Rmsd 6.0 Å                 |Rmsd 9.0 Å
-:-------------------------:|:-------------------------:|:-------------------------:|:-------------------------:
-![](images/rmsd1.jpg)  |  ![](images/rmsd2.jpg)  |  ![](images/rmsd3.jpg) |  ![](images/rmsd4.jpg) 
+Rmsd 1.0 Å                 |Rmsd 3.0 Å                 |Rmsd 6.0 Å                 
+:-------------------------:|:-------------------------:|:-------------------------:
+![](images/rmsd1.jpg)  |  ![](images/rmsd2.jpg)  |  ![](images/rmsd3.jpg)  
 
 finally in the trajectory you can all the intermediate conformations by adding --drmsd <float> option.
 
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 6.0 --drmsd 0.2 --ns 10 
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 3.0 --drmsd 0.2 --ns 10 
 
+![](images/rmsd3b.jpg)
 
 ### Morphing ###
 
