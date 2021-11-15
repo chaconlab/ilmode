@@ -4,5 +4,5 @@
 
 USER_OBJS :=
 
-LIBS := -lnma_gcc -lpdb2_gcc -ltools_gcc -larpack -llapack -lblas 
+LIBS := -lnma_gcc -lpdb2_gcc -ltools_gcc -llapack -lblas
 

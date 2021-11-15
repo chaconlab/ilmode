@@ -1576,9 +1576,10 @@ int main( int argc, char * argv[] )
 			mol2->coordMatrix( &coord2 );
 		}
 
+
 		for(int l=0; l<nloops; l++) // Iter loops in Loops Multi-PDB
 		{
-			fprintf(stderr,"Loop stuff %d of %d, num_atoms_loop= %d, ifr= %d  ilr= %d  chain= %c\n", l, nloops, num_atoms_loop, ifr, ilr, chain);
+			// fprintf(stdout,"Loop stuff %d of %d, num_atoms_loop= %d, ifr= %d  ilr= %d  chain= %c\n", l, nloops, num_atoms_loop, ifr, ilr, chain);
 
 //			mol->writePDB("mol0.pdb");
 //			molini->writePDB("molini0.pdb");
