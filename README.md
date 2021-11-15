@@ -40,19 +40,19 @@ Alternatively to a single mode motion, you can move in the direcction defined by
 ../scripts/renum_tr.pl 3hsz_allF_traj.pdb 3hsz_allB_traj.pdb > 3hsz_all.pdb
 </pre>
 
-Also with option -s 2 can move mutiple times (-ns times) in different random modal directions. For example to obtain only 10 conformations at 1.0Å from the original conformaiton use:   
+Also with option -s 2 can move mutiple times (-ns times) in different random modal directions. For example to obtain only 10 conformations at 1.0Å apart from the original loop conformation use:   
 <pre>
 ../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 1.0  --ns 10 
 </pre>
 and you can do it at different Rmsd cutoffs, i.e,  1.0Å , 3.0Å , and,  6.0Å:  
 
-Rmsd 1.0 Å                 |Rmsd 3.0 Å                 |Rmsd 6.0 Å                 
+--rmsd 1.0               |--rmsd 3.0                |--rmsd 6.0                 
 :-------------------------:|:-------------------------:|:-------------------------:
 ![](images/rmsd1.jpg)  |  ![](images/rmsd2.jpg)  |  ![](images/rmsd3.jpg)  
 
-finally in the trajectory you can all the intermediate conformations by adding --drmsd <float> option.
+finally, you can have in the trajectory file all the intermediate conformations by adding --drmsd <float> option.
 
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 3.0 --drmsd 0.2 --ns 10 
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 3.0 --drmsd 0.25 --ns 10 
 
 ![](images/rmsd3b.jpg)
 
