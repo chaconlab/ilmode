@@ -40,38 +40,19 @@ Alternatively to a single mode motion, you can move in the direcction defined by
 ../scripts/renum_tr.pl 3hsz_allF_traj.pdb 3hsz_allB_traj.pdb > 3hsz_all.pdb
 </pre>
 
-Also with option -s 2 can move --ns times  diffenrent random modal directions, in this only 10 conformations.   
+Also with option -s 2 can move mutiple times (-ns times) in different random modal directions. For example to obtain only 10 conformations at 1.0Å from the original conformaiton use:   
 <pre>
 ../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 1.0  --ns 10 
 </pre>
-and you can do it at different rmsds (--rmsd 3.0,--rmsd 3.0).   
+and you can do it at different Rmsd cutoffs, i.e,  1.0Å , 3.0Å , 6.0Å  and 9.0 Å:  
 
-<p float="left">
-  <img src="images/rmsd1.jpg" width="240"> 
-  <img src="images/rmsd2.jpg" width="240">
-  <img src="images/rmsd3.jpg" width="240"> 
-  <img src="images/rmsd4.jpg" width="240"> 
-</p>
+Rmsd 1.0 Å                 |Rmsd 3.0 Å                 |Rmsd 6.0 Å                 |Rmsd 9.0 Å
+:-------------------------:|:-------------------------:|:-------------------------:|:-------------------------:
+![](images/rmsd1.jpg)  |  ![](images/rmsd2.jpg)  |  ![](images/rmsd3.jpg) |  ![](images/rmsd4.jpg) 
 
-Rmsd 1.0 Å                 |Rmsd 3.0 Å                 |  Rmsd 6.0 Å
-:-------------------------:|:-------------------------:|:-------------------------:
-![](images/rmsd1.jpg)  |  ![](images/rmsd2.jpg)  |  ![](images/rmsd3.jpg) 
+finally in the trajectory you can all the intermediate conformations by adding --drmsd <float> option.
 
-
-
-</table>
- <tr width="100">
-  <td><img src="images/rmsd1.jpg" width="240"> </td>
-  <td><img src="images/rmsd2.jpg" width="240"> </td>
-  <td><img src="images/rmsd3.jpg" width="240"> </td>
- </tr>
-  <tr>
-    <td align="center" ><b style="font-size:30px">  Rmsd 1.0 Å </b></td>
-    <td align="center" ><b style="font-size:30px">  Rmsd 3.0 Å </b></td>
-    <td align="center" ><b style="font-size:30px">  Rmsd 6.0 Å </b></td>
-  </tr>
-  </table>
-
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 6.0 --drmsd 0.2 --ns 10 
 
 
 ### Morphing ###
