@@ -45,16 +45,24 @@ Also with option -s 2 can move --ns times  diffenrent random modal directions, i
 ../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 1.0  --ns 10 
 </pre>
 and you can do it at different rmsds (--rmsd 3.0,--rmsd 3.0).   
+
+<p float="left">
+  <td><img src="images/rmsd1.jpg" width="25"> </td>
+  <td><img src="images/rmsd3.jpg" width="25" > </td>
+  <td><img src="images/rmsd6.jpg" width="25"> </td>
+</p>
+
+
 </table>
  <tr>
-  <td><img src="images/rmsd1.jpg" width="120px" > </td>
-  <td><img src="images/rmsd2.jpg" width="120px" > </td>
-  <td><img src="images/rmsd3.jpg" width="120px" > </td>
+  <td><img src="images/rmsd1.jpg" width="25"> </td>
+  <td><img src="images/rmsd3.jpg" width="25" > </td>
+  <td><img src="images/rmsd6.jpg" width="25"> </td>
  </tr>
   <tr>
-    <td align="center" ><b style="font-size:12px">  Rmsd 1.0 Å </b></td>
-    <td align="center" ><b style="font-size:12px">  Rmsd 3.0 Å </b></td>
-    <td align="center" ><b style="font-size:12px">  Rmsd 6.0 Å </b></td>
+    <td align="center" ><b style="font-size:30px">  Rmsd 1.0 Å </b></td>
+    <td align="center" ><b style="font-size:30px">  Rmsd 3.0 Å </b></td>
+    <td align="center" ><b style="font-size:30px">  Rmsd 6.0 Å </b></td>
   </tr>
   </table>
 
