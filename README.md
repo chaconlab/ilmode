@@ -68,3 +68,6 @@ ilmode 3hsz.pdb  81 93 --chain A -t 3ht0.pdb -m 2 --skip_missingatoms -a 1 -i 1 
 
  
  
+Initial             | Trajectory               | Final                
+:-------------------------:|:-------------------------:|:-------------------------:
+![](images/morphI.jpg)  |  ![](images/morph.mp4)  |  ![](images/morphF.jpg)  
