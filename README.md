@@ -54,7 +54,7 @@ finally, you can have in the trajectory file all the intermediate conformations 
 
 ../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 3.0 --drmsd 0.25 --ns 10 
 
-<img src="images/rmsd3b.jpg" alt="alt text" width="120">
+<img src="images/rmsd3b.jpg" alt="alt text" width="220">
 
 ### Morphing ###
 
