@@ -79,7 +79,7 @@ bool morph_switch = false; // =true --> Enable morphing stuff
 bool mr_switch = false; // =true --> Enable Monte-Carlo stuff (random mode amplitudes)
 bool loops_switch = false; // =true --> Enable multiple loops processing
 bool anchors_present = true; // =true --> Anchors are present in loops Multi-PDB, otherwise just mobile residues present
-
+int traji=0; // traj count;
 
 // INPUT PARAMETERS (CUSTOMIZABLE by parser)
 //==============================================================================================
@@ -478,7 +478,7 @@ int main( int argc, char * argv[] )
 		SwitchArg Linear("","linear", "Enable linear motion using 1st order dy/dq derivatives, otherwise exact dihedral angles rotation (default=disabled).", true);
 		cmd.add( Linear );
 
-		SwitchArg Chi("x","chi", "Considers first CHI dihedral angle (default=disabled).", true);
+		SwitchArg Chi("x","chi", "Considers CHI dihedral angle (default=disabled).", true);
 		cmd.add( Chi );
 
 		ValueArg<float> Nevs("n","nevs", "Used modes range, either number [1,N] <integer>, or ratio [0,1) <float>. 0=All modes, 1= 1 mode. (default=All).",false,0.0,"int/float");
@@ -533,13 +533,13 @@ int main( int argc, char * argv[] )
 		ValueArg<std::string> Target("t","target", "Set target PDB file name to enable morphing (default=none).",false,"none","string");
 		cmd.add( Target );
 
-		SwitchArg MR("","mc", " Multiple random mdoe directtions.", true);
+		SwitchArg MR("","mc", " Multiple random modal directions.", true);
 		cmd.add( MR );
 
 		ValueArg<std::string> Name("o","name", "Output files basename (default=ilmode).",false,prog,"string");
 		cmd.add( Name );
 
-		ValueArg<int> Model("m","model", "Coarse-Grained model: 0=CA, 1=C5, 2=Heavy-Atom (default=2).",false,2,"int");
+		ValueArg<int> Model("m","model", "Coarse-Grained model: 0=CA, 1=C5, 2=Heavy-Atom, 3=C,CA,C (default=2)",false,2,"int");
 		cmd.add( Model );
 
 		ValueArg<char> Chain2("","chain2", "Chain ID for the target PDB (default=first chain)",false,1,"int");
@@ -562,6 +562,13 @@ int main( int argc, char * argv[] )
 
 		start = Start.getValue();
 		loop_end = End.getValue();
+
+		if (loop_end - start  < 2  )
+		{
+		 fprintf(stderr, "ilmode>  Error loop index (%d) < start index (%d) + 2 \n",loop_end, start);
+		 exit(1);
+		}
+
 
 		//		if(Start.isSet() && End.isSet())
 		//			loop_startend = true; // = true if Start and End residue indices were parsed
@@ -617,8 +624,10 @@ int main( int argc, char * argv[] )
 
 		imod = IndexMode.getValue() - 1; // indices must begin in "0"
 
-		if (imod >= (loop_end-start+1)*2-6 ) {
-		fprintf(stderr, "\n Error selected mode %d must < %d\n\n", imod+1, (loop_end-start+1)*2-6);
+
+
+		if (imod > (loop_end-start+1)*2-6 ) {
+		fprintf(stderr, "\n Error selected mode %d must < %d\n\n", imod  , (loop_end-start+1)*2-6);
 		exit(1);
 		}
 
@@ -637,6 +646,14 @@ int main( int argc, char * argv[] )
 			type = 2; // phi,chi,psi
 		else
 			type = 0; // phi,psi
+
+		if (model==0 or model==3) {
+			if (type == 2) {
+			type = 0; // phi,psi
+			printf("Parser> Chi angle incompatible with this model\n");
+
+			}
+		}
 
 		linear_switch = Linear.isSet(); // =true --> linear motion
 
@@ -659,6 +676,12 @@ int main( int argc, char * argv[] )
 		if (strategy) {
 			mr_switch = true;
 		}
+
+		if (morph_switch) {
+					mr_switch = false;
+		}
+
+
 
 		nsamples = NSamples.getValue(); // Number of samples for selected strategy
 		target_rmsd = RMSD.getValue(); // Target RMSD for mode-following strategies
@@ -823,7 +846,7 @@ int main( int argc, char * argv[] )
 	}
 	else if(strncmp(file_pdb+strlen(file_pdb)-4,".pdb",4) == 0)
 	{
-		fprintf(stdout,"SINGLE RUN MODE (%s has .pdb extension)\n",file_pdb);
+		fprintf(stdout,"ilmode> Single run mode (%s has .pdb extension)\n",file_pdb);
 		npdbs = 1; // Single-run
 
 		// Memory allocation
@@ -956,7 +979,7 @@ int main( int argc, char * argv[] )
 		// Setting Coarse-Graining model ("mol" will hold current CG'ed Macromol.)
 		switch(model)
 		{
-		case 0: // CA-IC model: CA + (NH and CO)-terminal model
+		case 0: // CA-IC model: CA + (NH and CO)-terminal
 		{
 			printf( "%s> Coarse-Graining model: CA-model\n", prog);
 
@@ -1494,7 +1517,7 @@ int main( int argc, char * argv[] )
 		if(props[ifr + reglen].nan != 1) // If not Proline
 			size++; // considering Ct-anchor Phi angle? (If Ct-anchor is Proline it does not have Phi)
 
-		if (imod >= (reglen)*2-6 ) {
+		if (imod >  (reglen)*2-6 ) {
 				fprintf(stderr, "\n Error selected mode %d must < %d --> Pro inside the loop \n\n", imod+1, (reglen)*2-6);
 				exit(1);
 		}
@@ -1665,7 +1688,7 @@ int main( int argc, char * argv[] )
 				if(morph_switch)
 				{
 					rmsd_old = 999999; // some high value required
-
+					if(verb > 1)
 					printf("> Initial structure dumped into Muli-PDB\n");
 					mol->writeMloop(file_movie, 1, ifr-1, ilr+1, chain);
 				}
@@ -1770,7 +1793,7 @@ int main( int argc, char * argv[] )
 					}
 
 					// IPAs checking
-					if(verb > 1 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
+					if(verb > 2 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
 						for(int i=0; i<nipa; i++)
 							printf("ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
 
@@ -1821,7 +1844,7 @@ int main( int argc, char * argv[] )
 					{
 						scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
 						if(verb > 1)
-							show_vectors(stdout,eigvect,size,neig,"Dumping Scaled Eigenvectors:", " %5.2e");
+							show_vectors(stdout,eigvect,size,neig,"Dumping Scaled EigenvectorsA:", " %5.2e");
 					}
 
 					// Compute the Cartesian eigenvectors from the Internal Coordinates eigenvectors
@@ -1835,7 +1858,9 @@ int main( int argc, char * argv[] )
 					}
 					free(der); // Free obsolete derivatives
 
-					//					fprintf(stderr,"size= %d  nlrs= %d\n",size,nlrs);
+					//show_vectors(stdout,cevec,ncomps,neig,"Dumping Raw CC Eigenvectors:", " %5.2e");
+
+					//fprintf(stderr,"size= %d  nlrs= %d %d\n",size,nlrs, f);
 					//					exit(0);
 
 					// Store reference mode "refmode" to maintain the requested direction
@@ -1885,9 +1910,10 @@ int main( int argc, char * argv[] )
 							break;
 						}
 						}
-					}
+					}  // end morph switch
 					else if(mr_switch) // Monte-Carlo
 					{
+
 						//				// Generate some random vector in CC
 						//				for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
 						//					refmode[ k ] = 2*rg->Random() - 1.0; // rg->Random() --> Output random float number in the interval 0 <= x < 1
@@ -1920,14 +1946,20 @@ int main( int argc, char * argv[] )
 					}
 					else // Mode following
 					{
+
 						// Use selected mode as reference vector (only on the first iteration!)
 						if(f==0)
 						{
+							//fprintf(stderr,"hola1\n");
 							for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
 								refmode[ k ] = cevec[imod*ncomps + k ];
+							//fprintf(stderr,"hola2\n");
 
 							modref = vector_modulus( refmode, ncomps ); // Reference vector modulus
+							//fprintf(stderr,"hola3\n");
+
 						}
+
 					}
 
 					sprintf(text,"%s> %4d ", prog, f);
@@ -2080,7 +2112,10 @@ int main( int argc, char * argv[] )
 
 						sprintf(dummy, " %7.4f", rmsd);
 						strcat(text, dummy);
+
+						if(verb > 0)
 						printf("%s\n", text); // Dump all output for current frame
+
 						fprintf(f_log, "%s\n", text); // Dump log info
 
 						// Morphing Convergence Test
@@ -2097,6 +2132,8 @@ int main( int argc, char * argv[] )
 						rmsd = rmsd_loop(iterini, itermol, ifa, num_atoms_loop);
 						sprintf(dummy, " %7.4f", rmsd);
 						strcat(text, dummy);
+
+						if(verb > 0)
 						printf("%s\n", text); // Dump all output for current frame
 						fprintf(f_log, "%s\n", text); // Dump log info
 
@@ -2127,8 +2164,8 @@ int main( int argc, char * argv[] )
 					// if(delta_rmsd < rmsd - last_rmsd)
 					if(delta_rmsd < fabsf(rmsd - last_rmsd) )
 					{
-						printf("> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", rmsd - last_rmsd, delta_rmsd);
-						mol->writeMloop(file_movie, f+1, ifr-1, ilr+1, chain);
+						printf("%s> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", prog, rmsd - last_rmsd, delta_rmsd);
+						mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
 						last_rmsd = rmsd; // Keep last saved RMSD
 					}
 
@@ -2139,10 +2176,11 @@ int main( int argc, char * argv[] )
 				}
 
 				if(delta_rmsd != 999999)
-				printf("> Final structure dumped into Muli- and final- PDBs dRMSD = %8f > %8f\n", rmsd - last_rmsd, delta_rmsd);
+				printf("%s> Saving %s and %sdRMSD = %8f > %8f\n", prog, file_movie, file_final, rmsd - last_rmsd, delta_rmsd);
 				else
-					printf("> Final structure dumped into Muli-PDBs dRMSD = %8f\n", rmsd );
-				mol->writeMloop(file_movie, f+1, ifr-1, ilr+1, chain);
+					printf("%s> Final structure dumped into Muli-PDBs dRMSD = %8f\n", prog, rmsd );
+
+				mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
 
 				if(morph_switch) // Morphing protocol
 				{
@@ -2268,7 +2306,7 @@ int main( int argc, char * argv[] )
 				}
 
 				// IPAs checking
-				if(verb > 1 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
+				if(verb > 2 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
 					for(int i=0; i<nipa; i++)
 						printf("ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
 
@@ -2319,11 +2357,14 @@ int main( int argc, char * argv[] )
 				// Compute the Cartesian eigenvectors from the Internal Coordinates eigenvectors
 				double *cevec; // Cartesian eigenvectors
 				cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3);
+
+
 				free(der); // Free obsolete derivatives
 
 				// Show Cartesian normal mode in VMD
-				// sprintf(text, "%s_mode%02d.vmd", name, imod+1);
-				// show_cartmode(coord, cevec, props, ifr, num_atoms_loop + 3, text, imod);
+//				 sprintf(text, "%s_mode%02d.vmd", name, imod+1);
+//					printf("%s> saving %s\n", prog, text);
+//				  show_cartmode(coord, cevec, props, ifr, num_atoms_loop + 3, text, imod);
 
 				// sampling
 				for(int f = 0; f < nsamples; f++) // Generate N-samples (frames)
@@ -2412,7 +2453,7 @@ int main( int argc, char * argv[] )
 				cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3, masses_loop);
 				free(der);
 
-				// show_vectors(stdout,cevec,ncomps,neig,"Dumping Raw CC Eigenvectors:", " %5.2e");
+				//show_vectors(stdout,cevec,ncomps,neig,"Dumping Raw CC Eigenvectors:", " %5.2e");
 
 				double *xnm; // Coordinate in Normal Modal space
 				xnm = (double *) malloc( sizeof(double) * neig); // Allocate NM coordinate
