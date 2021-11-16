@@ -48,7 +48,7 @@ and you can do it at different Rmsd cutoffs, i.e,  1.0Å , 3.0Å , and,  6.0�
 
 --rmsd 1.0               |--rmsd 3.0                |--rmsd 6.0                 
 :-------------------------:|:-------------------------:|:-------------------------:
-![](images/rmsd1.jpg)  |  ![](https://user-images.githubusercontent.com/19269061/141989128-c48c87b2-0a15-47b2-a560-0dbf5a3ee96e.mp4)  |  ![](images/rmsd3.jpg)  
+![](images/rmsd1.jpg)  |  ![] (images/rmsd2.jpg)  |  ![](images/rmsd3.jpg)  
 
 finally, you can have in the trajectory file all the intermediate conformations by adding --drmsd <float> option.
 
@@ -66,8 +66,11 @@ ilmode 3irs.pdb  66 76 --chain C -t 3k4w.pdb -m 1 -a 1  --ns 2000 --flanks 2 --a
 ilmode 3hsz.pdb  81 93 --chain A -t 3ht0.pdb -m 2 --skip_missingatoms -a 1 -i 1  --ns 2000  --drmsd 0.25 -o  _morph --verb 1 -x --flanks 2 --aliflanks
 </pre>
 
- 
+  <video  width="320px" height="175px"  src="https://user-images.githubusercontent.com/19269061/141989128-c48c87b2-0a15-47b2-a560-0dbf5a3ee96e.mp4" autoplay="true" loop="true" controls="controls" >
+  </video>
  
 Initial             | Trajectory               | Final                
 :-------------------------:|:-------------------------:|:-------------------------:
-![](images/morphI.jpg)  |  ![](https://user-images.githubusercontent.com/19269061/141989128-c48c87b2-0a15-47b2-a560-0dbf5a3ee96e.mp4)  |  ![](images/morphF.jpg)  
+![](images/morphI.jpg)  | 
+  <video  width="320px" height="175px"  src="https://user-images.githubusercontent.com/19269061/141989128-c48c87b2-0a15-47b2-a560-0dbf5a3ee96e.mp4" autoplay="true" loop="true" controls="controls" >
+  </video> |  ![](images/morphF.jpg)  
