@@ -7,8 +7,8 @@ Moving closed-loops with Normal Mode Analysis with constraints in internal coord
 
 Move a closed-loop along a given mode direction till reach a give rmsd from the inital conformation: 
 <pre>
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 20 -o _mod1F -m 2 -s 0 -a  1  --rmsd 3.0 --drmsd 0.25 --verb 0
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 20 -o _mod1B -m 2 -s 0 -a -1  --rmsd 3.0 --drmsd 0.25 --verb 0    
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 20 -o _mod1F -m 2 -s 0 -a  1  --rmsd 3.0 --drmsd 0.25 
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 20 -o _mod1B -m 2 -s 0 -a -1  --rmsd 3.0 --drmsd 0.25   
 ../scripts/renum_tr.pl 3hsz_mod1F_traj.pdb 3hsz_mod1B_traj.pdb > 3hsz_mod20.pdb
 </pre>
 The first command move forward (-a 1) the 81-93 loop until the rmsd from the inital position is > 3.0 Å (--rmsd 3.0). Every 0.25Å (--drmsd 0.25) away from the intial pose the moved loop coordinates are saved in the 3hsz_mod1F_traj.pdb trajectory file.  The second command do the same but backwards, and the final generate a forward-backward trajectory like this:  
@@ -35,8 +35,8 @@ done
 
 Alternatively to a single mode motion, you can move in the direcction defined by a random contribution of all the modes:   
 <pre>
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _allF -m 2 -s 1 -a  1  --rmsd 3.0 --drmsd 0.25 --verb 0
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _allB -m 2 -s 1 -a -1  --rmsd 3.0 --drmsd 0.25 --verb 0 
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _allF -m 2 -s 1 -a  1  --rmsd 3.0 --drmsd 0.25 
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _allB -m 2 -s 1 -a -1  --rmsd 3.0 --drmsd 0.25
 ../scripts/renum_tr.pl 3hsz_allF_traj.pdb 3hsz_allB_traj.pdb > 3hsz_all.pdb
 </pre>
 
@@ -63,7 +63,7 @@ ilmode 3irs.pdb  66 76 --chain C -t 3k4w.pdb -m 1 -a 1  --ns 2000 --flanks 2 --a
 </pre>
 
 <pre>
-ilmode 3hsz.pdb  81 93 --chain A -t 3ht0.pdb -m 2 --skip_missingatoms -a 1 -i 1  --ns 2000  --drmsd 0.25 -o  _morph --verb 1 -x --flanks 2 --aliflanks
+ilmode 3hsz.pdb  81 93 --chain A -t 3ht0.pdb -m 2 --skip_missingatoms -a 1 -i 1  --ns 2000  --drmsd 0.25 -o  _morph  -x --flanks 2 --aliflanks
 </pre>
 
  
