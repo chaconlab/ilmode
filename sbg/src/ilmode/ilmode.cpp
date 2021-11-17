@@ -41,7 +41,7 @@ typedef struct
 
 
 /*==============================================================================================*/
-char version[]="1.09"; // version code
+char version[]="1.10"; // version code
 char prog[]="ilmode"; // program name
 
 // Input variables
@@ -53,8 +53,8 @@ char file_final[FILE_NAME];	// Morphed PDB structure file name
 char file_log[FILE_NAME]; // Log file
 char name[FILE_NAME];
 char base[FILE_NAME];
-char text[FILE_NAME*2];
-char dummy[FILE_NAME];
+char text[FILE_NAME*10];
+char dummy[FILE_NAME*10];
 char saved_files[2000]; // string to buffer screen output until the program end.
 
 // INPUT PARAMETERS (PRE-DEFINED)
@@ -112,6 +112,11 @@ double maxang = 0.0; // Maximum angular increment to normalize modes [deg]
 double dc; // Characteristic distance factor for Deformability computations (see: hardy and compute_def functions in libnma_def.cpp)
 char chain = '*'; // Chain ID for initial PDB
 char chain2 = '*'; // Chain ID for target PDB
+
+
+
+
+
 
 extern "C" {
 
@@ -386,7 +391,7 @@ int get_max_index(double *v, int n);
 //==============================================================================================
 int main( int argc, char * argv[] )
 {
-	printf("%s>\n%s> Welcome to the Internal coordinates Loops Modal analysis tool v%s\n%s>\n",prog,prog,version,prog);
+	fprintf( stdout, "%s>\n%s> Welcome to the Internal coordinates Loops Modal analysis tool v%s\n%s>\n",prog,prog,version,prog);
 	std::string temp;
 
 	// COMMAND-LINE PARSER:
@@ -394,11 +399,11 @@ int main( int argc, char * argv[] )
 	CmdLine cmd(argv[0],"Some text here... Shown with -h option", version );
 	try {
 
-//		printf("EXAMPLES: \n"
-//				"  Example-1: %s DHV15_3agoA2.pdb 29 40 -t DHV15_3agnA1_ali.pdb -m 2 -i 1 -a 1 -C 1 -o helixchi -x\n"
-//				"  Example-2: %s DHV15_3agoA2.pdb 29 40 -t DHV15_3ahwA3_ali.pdb -m 2 -i 1 -a 1 -C 1 -o morphchi -x\n"
-//				"  Example-3: %s DHV15_3agoA2.pdb 29 40 -m 2 -n 3 -i 1 -a 1 -C 1 -o kk -x\n"
-//				"  Example-4: %s DHV15_3agoA2.pdb 29 40 -m 2 -i 1 -a 1 -s 2 --ns 100 --rmsd 2 -o kk\n",prog,prog,prog,prog);
+		//		fprintf(stdout,"EXAMPLES: \n"
+		//				"  Example-1: %s DHV15_3agoA2.pdb 29 40 -t DHV15_3agnA1_ali.pdb -m 2 -i 1 -a 1 -C 1 -o helixchi -x\n"
+		//				"  Example-2: %s DHV15_3agoA2.pdb 29 40 -t DHV15_3ahwA3_ali.pdb -m 2 -i 1 -a 1 -C 1 -o morphchi -x\n"
+		//				"  Example-3: %s DHV15_3agoA2.pdb 29 40 -m 2 -n 3 -i 1 -a 1 -C 1 -o kk -x\n"
+		//				"  Example-4: %s DHV15_3agoA2.pdb 29 40 -m 2 -i 1 -a 1 -s 2 --ns 100 --rmsd 2 -o kk\n",prog,prog,prog,prog);
 
 		// Define required arguments no labeled (mandatory)
 		// ---------------------------------------------------------------------------------------------------------------
@@ -565,8 +570,8 @@ int main( int argc, char * argv[] )
 
 		if (loop_end - start  < 2  )
 		{
-		 fprintf(stderr, "ilmode>  Error loop index (%d) < start index (%d) + 2 \n",loop_end, start);
-		 exit(1);
+			fprintf(stderr, "ilmode>  Error loop index (%d) < start index (%d) + 2 \n",loop_end, start);
+			exit(1);
 		}
 
 
@@ -616,7 +621,7 @@ int main( int argc, char * argv[] )
 		nevec_fact = Nevs.getValue();
 		if(nevec_fact < 0) // checking
 		{
-			printf("Parser> Error, invalid number of eigenvectors requested (%f)!\nForcing exit!\n",nevec_fact);
+			fprintf(stdout,"%s> Error, invalid number of eigenvectors requested (%f)!\nForcing exit!\n",prog,nevec_fact);
 			exit(1);
 		}
 
@@ -626,18 +631,14 @@ int main( int argc, char * argv[] )
 
 
 
-		if (imod > (loop_end-start+1)*2-6 ) {
-		fprintf(stderr, "\n Error selected mode %d must < %d\n\n", imod  , (loop_end-start+1)*2-6);
-		exit(1);
-		}
 
 		verb = Verb.getValue();
-		printf("Parser> Verbose level: %d\n", verb);
+		fprintf(stdout,"%s> Verbose level: %d\n", prog, verb);
 
 		if(Norm.isSet())
 		{
 			norm_modes = true;
-			printf("Parser> Normal modes will be normalized into unit vectors.\n");
+			fprintf(stdout,"%s> Normal modes will be normalized into unit vectors.\n", prog);
 		}
 
 		// Setting model and chi
@@ -649,8 +650,8 @@ int main( int argc, char * argv[] )
 
 		if (model==0 or model==3) {
 			if (type == 2) {
-			type = 0; // phi,psi
-			printf("Parser> Chi angle incompatible with this model\n");
+				type = 0; // phi,psi
+				fprintf(stdout,"%s> Chi angle incompatible with this model\n", prog);
 
 			}
 		}
@@ -665,7 +666,7 @@ int main( int argc, char * argv[] )
 
 		if( potential == 4 && model != 0 ) // ED-NMA only valid for CA-model
 		{
-			printf("Parser> At this moment, the edNMA potential is only valid for CA-model!\nForcing exit!\n");
+			fprintf(stdout,"%s> At this moment, the edNMA potential is only valid for CA-model!\nForcing exit!\n", prog);
 			exit(1);
 		}
 
@@ -678,7 +679,7 @@ int main( int argc, char * argv[] )
 		}
 
 		if (morph_switch) {
-					mr_switch = false;
+			mr_switch = false;
 		}
 
 
@@ -707,7 +708,7 @@ int main( int argc, char * argv[] )
 			int l=0;
 			if ((fp = fopen("/dev/urandom", "r")) == NULL)
 			{
-				fprintf(stderr, "Error! Could not open /dev/urandom for read\n");
+				fprintf(stderr, "%s> Error! Could not open /dev/urandom for read\n%s> Exit\n", prog, prog);
 				exit(2);
 			}
 			fread(b,1,4,fp);
@@ -721,7 +722,7 @@ int main( int argc, char * argv[] )
 			seed = (unsigned int) l;
 			fclose(fp);
 		}
-		printf("Parser> Mersenne Twister's SEED: --seed = %u\n",seed);
+		fprintf(stdout,"%s> Mersenne Twister's SEED: --seed = %u\n",prog, seed);
 
 		if(DelHeteros.isSet())
 			delHeteros_switch = true; // Delete heteroatoms
@@ -768,7 +769,7 @@ int main( int argc, char * argv[] )
 	//	sprintf(text,"%s%s.log",prog,base);
 	//	if( !(f_com=(FILE *)fopen(text,"w") ) )
 	//	{
-	//		printf("Sorry, unable to open LOG FILE: %s\n",text);
+	//		fprintf(stdout,"Sorry, unable to open LOG FILE: %s\n",text);
 	//		exit(1);
 	//	}
 	//	for(int i=0; i<argc; i++)
@@ -790,7 +791,7 @@ int main( int argc, char * argv[] )
 	inputdata *input = NULL;
 	//	if( !(input = (inputdata*) malloc( sizeof(inputdata) * 1 ))) // Allocate just one element (later realloc)
 	//	{
-	//		printf("Sorry, unable to allocate memory!!!\n");
+	//		fprintf(stdout,"Sorry, unable to allocate memory!!!\n");
 	//		exit(1);
 	//	}
 
@@ -815,14 +816,14 @@ int main( int argc, char * argv[] )
 		int nscan = 0;
 		while( fgets(myline, 1024, p_file) )
 		{
-			//printf("%s\n",myline);
+			//fprintf(stdout,"%s\n",myline);
 
 			if(myline[0] != '#')
 			{
 				// Memory allocation
 				if( !(input = (inputdata*) realloc(input, sizeof(inputdata) * (npdbs+1) ))) // Reallocate elements
 				{
-					printf("Sorry, unable to re-allocate memory for %d elements!!!\n", (npdbs+1));
+					fprintf(stdout,"Sorry, unable to re-allocate memory for %d elements!!!\n", (npdbs+1));
 					exit(1);
 				}
 
@@ -836,13 +837,18 @@ int main( int argc, char * argv[] )
 
 				input[npdbs].chain = mystring[0]; // with %c this does not work...
 
-				printf("rcd> %2d %8s %8d %8d %c\n",npdbs+1, input[npdbs].fname, input[npdbs].start, input[npdbs].end, input[npdbs].chain);
+				fprintf(stdout,"rcd> %2d %8s %8d %8d %c\n",npdbs+1, input[npdbs].fname, input[npdbs].start, input[npdbs].end, input[npdbs].chain);
 
 				npdbs++;
 			}
 		}
 
 		fclose(p_file); // Close file upon reading input text file...
+		for(int p = 0; p < npdbs; p++)
+		{
+			fprintf( stdout, "%s> %2d %8s %8d %8d %c\n", prog, p+1, input[p].fname, input[p].start, input[p].end, input[p].chain);
+		}
+
 	}
 	else if(strncmp(file_pdb+strlen(file_pdb)-4,".pdb",4) == 0)
 	{
@@ -863,10 +869,6 @@ int main( int argc, char * argv[] )
 		exit(2);
 	}
 
-	for(int p = 0; p < npdbs; p++)
-	{
-		printf("%s> %2d %8s %8d %8d %c\n", prog, p+1, input[p].fname, input[p].start, input[p].end, input[p].chain);
-	}
 
 	// exit(0);
 
@@ -885,7 +887,7 @@ int main( int argc, char * argv[] )
 		strncpy(name, input[p].fname, len); // Concatenate without extension and dot
 		name[len] = '\0'; // mandatory...
 		strcat(name,base); // Overwrite previous "name" with the general "base"
-		printf( "%s> Current basename: %s\n", prog, name );
+		fprintf( stdout, "%s> Current basename: %s\n", prog, name );
 
 		// Copy required variables
 		start = input[p].start;
@@ -893,36 +895,41 @@ int main( int argc, char * argv[] )
 		chain = input[p].chain;
 
 		// READING INPUT INITIAL PDB
-		printf( "%s> Reading Initial PDB file: %s\n", prog, input[p].fname );
+
+		fprintf( stdout, "%s> Reading PDB file: %s\n", prog, input[p].fname );
 		Macromolecule *molr = new Macromolecule( input[p].fname );
 		molr->readPDB(input[p].fname);
 		if(delHydrogens_switch)
 		{
-			printf( "%s> Deleting Hydrogen atoms (if any)...\n",prog );
+			if (verb > 1)
+				fprintf( stdout, "%s> Deleting Hydrogen atoms (if any)...\n",prog );
 			molr->deleteHYDS();
 		}
 		if(delHeteros_switch || model == 0) // CA model can't deal with HETATM's... (TO DO)
 		{
-			printf( "%s> Deleting Hetero-atoms (if any)...\n",prog );
+			if (verb > 1)
+				fprintf( stdout, "%s> Deleting Hetero-atoms (if any)...\n",prog );
 			molr->delete_heteros();
 		}
 		if(delWaters_switch)
 		{
-			printf( "%s> Deleting Water molecules (if any)...\n", prog );
+			if (verb > 1)
+				fprintf( stdout, "%s> Deleting Water molecules (if any)...\n", prog );
 			molr->delete_waters();
 		}
-		molr->info(stdout);
+		if (verb > 1)
+			molr->info(stdout);
 
 		// Formating Initial PDB first
 		if(verb > 1)
-			printf( "%s> Formatting residues order and checking for missing atoms\n", prog );
+			fprintf( stdout, "%s> Formatting residues order and checking for missing atoms\n", prog );
 		if(molr->format_residues(false,model) > 0)
 		{
 			if(skip_missingatoms) // skip missing atoms
-				printf( "%s> Warning, missing atom(s) found! Be aware of wrong results!\n", prog );
+				fprintf( stdout, "%s> Warning, missing atom(s) found! Be aware of wrong results!\n", prog );
 			else
 			{
-				printf( "%s> Error, missing atom(s) found! Forcing exit!\n", prog );
+				fprintf( stdout, "%s> Error, missing atom(s) found! Forcing exit!\n", prog );
 				exit(1);
 			}
 		}
@@ -941,36 +948,40 @@ int main( int argc, char * argv[] )
 		if(morph_switch) // Morphing stuff
 		{
 			// READING TARGET PDB
-			printf( "%s> Reading Target PDB file: %s\n", prog, file_pdb2 );
+			fprintf( stdout, "%s> Reading Target PDB file: %s\n", prog, file_pdb2 );
 			molr2 = new Macromolecule( file_pdb2 );
 			molr2->readPDB(file_pdb2);
 			if(delHydrogens_switch)
 			{
-				printf( "%s> Deleting Hydrogen atoms (if any)...\n",prog );
+				if (verb > 1)
+					fprintf( stdout, "%s> Deleting Hydrogen atoms (if any)...\n",prog );
 				molr2->deleteHYDS();
 			}
 			if(delHeteros_switch || model == 0) // CA model can't deal with HETATM's... (TO DO)
 			{
-				printf( "%s> Deleting Hetero-atoms (if any)...\n",prog );
+				if (verb > 1)
+					fprintf( stdout, "%s> Deleting Hetero-atoms (if any)...\n",prog );
 				molr2->delete_heteros();
 			}
 			if(delWaters_switch)
 			{
-				printf( "%s> Deleting Water molecules (if any)...\n", prog );
+				if (verb > 1)
+					fprintf( stdout, "%s> Deleting Water molecules (if any)...\n", prog );
 				molr2->delete_waters();
 			}
-			molr2->info(stdout);
+			if (verb > 1)
+				molr2->info(stdout);
 
 			// Formating TARGET PDB first
 			if(verb > 1)
-				printf( "%s> Formatting residues order and checking for missing atoms\n", prog );
+				fprintf( stdout, "%s> Formatting residues order and checking for missing atoms\n", prog );
 			if(molr2->format_residues(false,model) > 0)
 			{
 				if(skip_missingatoms) // skip missing atoms
-					printf( "%s> Warning, missing atom(s) found! Be aware of wrong results!\n", prog );
+					fprintf( stdout, "%s> Warning, missing atom(s) found! Be aware of wrong results!\n", prog );
 				else
 				{
-					printf( "%s> Error, missing atom(s) found! Forcing exit!\n", prog );
+					fprintf( stdout, "%s> Error, missing atom(s) found! Forcing exit!\n", prog );
 					exit(1);
 				}
 			}
@@ -981,7 +992,7 @@ int main( int argc, char * argv[] )
 		{
 		case 0: // CA-IC model: CA + (NH and CO)-terminal
 		{
-			printf( "%s> Coarse-Graining model: CA-model\n", prog);
+			fprintf( stdout, "%s> Coarse-Graining model: CA-model\n", prog);
 
 			// N,CA,C selection
 			molNCAC = molr->select( ncac2 );
@@ -1018,7 +1029,7 @@ int main( int argc, char * argv[] )
 		}
 		case 3: // N,CA,C-model
 		{
-			printf( "%s> Coarse-Graining model: N,CA,C-model (ideal for KORP integration)\n", prog);
+			fprintf( stdout, "%s> Coarse-Graining model: N,CA,C-model (ideal for KORP integration)\n", prog);
 
 			mol = molr->select( ncac2 ); // N,CA,C selection
 			mass_NCAC( mol ); // Makes model
@@ -1033,7 +1044,7 @@ int main( int argc, char * argv[] )
 		}
 		case 1: // 3BB2R model
 		{
-			printf( "%s> Coarse-Graining model: 3BB2R\n", prog);
+			fprintf( stdout, "%s> Coarse-Graining model: 3BB2R\n", prog);
 			mol = molr;
 
 			// Makes 3BB2R reduced model
@@ -1041,7 +1052,7 @@ int main( int argc, char * argv[] )
 			//     Thus, 3 dihedral angles are needed for each residue (phi, psi, chi).
 			//     There are a few exceptions: for Ala, Gly and Pro,
 			//     and for the 1st and last residues.
-			printf("%s> Creating 3BB2R reduced model:\n", prog);
+			fprintf( stdout, "%s> Creating 3BB2R reduced model:\n", prog);
 			cg_3BBR2( mol );
 
 			if(morph_switch)
@@ -1054,7 +1065,7 @@ int main( int argc, char * argv[] )
 		}
 		case 2: // Full-Atom
 		{
-			printf( "%s> Coarse-Graining model: All heavy atoms (no coarse-graining)\n", prog);
+			fprintf( stdout, "%s> Coarse-Graining model: All heavy atoms (no coarse-graining)\n", prog);
 			mol = molr;
 
 			// Add appropriate masses to the All-Heavy-Atoms model
@@ -1127,7 +1138,7 @@ int main( int argc, char * argv[] )
 				strncpy(dummy, input[p].fname, len); // Overwrite with current pdb name without extension
 				dummy[len] = '\0'; // required for "strncpy"
 				strcat(dummy, file_loops); // Concatenate without extension and dot
-				printf( "%s> Current Loops Multi-PDB file name: %s (file_loops= %s)\n", prog, dummy, file_loops );
+				fprintf( stdout, "%s> Current Loops Multi-PDB file name: %s (file_loops= %s)\n", prog, dummy, file_loops );
 			}
 			else // Single-run
 			{
@@ -1135,31 +1146,31 @@ int main( int argc, char * argv[] )
 			}
 
 			if(debug)
-				printf( "%s> Reading Loops Multi-PDB: %s\n", prog, dummy );
+				fprintf( stdout, "%s> Reading Loops Multi-PDB: %s\n", prog, dummy );
 			loopsr = new Macromolecule(dummy); // Reading loops Multi-PDB into a Macromolecule (each loop will be a molecule)
 			loopsr->readPDB(dummy);
 			if(debug)
-				printf( "%s> Deleting Hydrogen atoms (if any)...\n", prog );
+				fprintf( stdout, "%s> Deleting Hydrogen atoms (if any)...\n", prog );
 			loopsr->deleteHYDS();
 			if(debug)
-				printf( "%s> Deleting Hetero-atoms (if any)...\n", prog );
+				fprintf( stdout, "%s> Deleting Hetero-atoms (if any)...\n", prog );
 			loopsr->delete_heteros();
 			if(debug)
-				printf( "%s> Deleting Water molecules (if any)...\n", prog );
+				fprintf( stdout, "%s> Deleting Water molecules (if any)...\n", prog );
 			loopsr->delete_waters();
-			//		printf( "%s> Deleting duplicate atoms within residue (if any)...\n", prog );
+			//		fprintf( stdout, "%s> Deleting duplicate atoms within residue (if any)...\n", prog );
 			//		loopsr->delete_duplicates(); // Remove duplicate atoms
 
 			// Formating residues of all Loops at once
 			if(debug)
-				printf( "%s> Formatting Loops Multi-PDB residues order and checking for missing atoms, model= %d\n", prog, model );
+				fprintf( stdout, "%s> Formatting Loops Multi-PDB residues order and checking for missing atoms, model= %d\n", prog, model );
 			if(loopsr->format_residues(false,model) > 0)
 			{
 				if(skip_missingatoms) // skip missing atoms
-					printf( "%s> Warning, missing atom(s) found in loops Multi-PDB! Be aware of wrong results!\n", prog );
+					fprintf( stdout, "%s> Warning, missing atom(s) found in loops Multi-PDB! Be aware of wrong results!\n", prog );
 				else
 				{
-					printf( "%s> Error, missing atom(s) found in Loops Multi-PDB! (according to %d CG-model). Forcing exit!\n", prog, model );
+					fprintf( stdout, "%s> Error, missing atom(s) found in Loops Multi-PDB! (according to %d CG-model). Forcing exit!\n", prog, model );
 					exit(1);
 				}
 			}
@@ -1169,7 +1180,7 @@ int main( int argc, char * argv[] )
 
 			if(debug)
 			{
-				printf( "%s> Written formated Loops Multi-PDB\n", prog );
+				fprintf( stdout, "%s> Written formated Loops Multi-PDB\n", prog );
 				loopsr->writePDB( "loopsformatted.pdb" );
 			}
 
@@ -1207,7 +1218,7 @@ int main( int argc, char * argv[] )
 				ri--;
 				rf++;
 			}
-			printf( "%s> Anchor residues obtained from Multi-PDB loop %s --> Nt %d, Ct %d (PDB numeration) Chain_id= \"%c\"\n", prog, file_loops, ri, rf, chain );
+			fprintf( stdout, "%s> Anchor residues obtained from Multi-PDB loop %s --> Nt %d, Ct %d (PDB numeration) Chain_id= \"%c\"\n", prog, file_loops, ri, rf, chain );
 
 			// Mobile loop conditions
 			if(anchors_present) // Anchors must be removed if present
@@ -1230,7 +1241,7 @@ int main( int argc, char * argv[] )
 			// Cross-checking input
 			if( start >= 0 && loop_end >= 0 && (ri+1 != start || rf-1 != loop_end) )
 			{
-				printf( "%s> Error, loop residue indices mismatch between parser or Loops-Multi-pdb (ri=%d rf=%d) and loops file (start=%d end=%d). Forcing exit!\n", prog, ri, rf, start, loop_end);
+				fprintf( stdout, "%s> Error, loop residue indices mismatch between parser or Loops-Multi-pdb (ri=%d rf=%d) and loops file (start=%d end=%d). Forcing exit!\n", prog, ri, rf, start, loop_end);
 				exit(1);
 			}
 
@@ -1302,7 +1313,7 @@ int main( int argc, char * argv[] )
 		}
 		delete iter_ch;
 
-		printf("%s> Internal indices of first (%d) or last (%d) mobile residues of the initial loop (chain %c)\n", prog, ifr, ilr, chain);
+		fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) mobile residues of the initial loop (chain %c)\n", prog, ifr, ilr, chain);
 
 		// Some checking
 		if(ifr < 0 || ilr < 0)
@@ -1375,7 +1386,7 @@ int main( int argc, char * argv[] )
 				exit(1);
 			}
 
-			printf("%s> Internal indices of first (%d) or last (%d) mobile residues of the target loop (chain %c)\n", prog, ifr2, ilr2, chain);
+			fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) mobile residues of the target loop (chain %c)\n", prog, ifr2, ilr2, chain);
 
 			// Some checking
 			if(ifr2 < 0 || ilr2 < 0)
@@ -1391,7 +1402,7 @@ int main( int argc, char * argv[] )
 		int ila; // internal index of the last mobile atom of the loop
 		ifa = props[ifr].k1;
 		ila = props[ilr+1].k1 - 1;
-		printf("%s> Internal indices of first (%d) or last (%d) mobile atoms of the initial loop\n", prog, ifa, ila);
+		fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) mobile atoms of the initial loop\n", prog, ifa, ila);
 
 		int iffa; // internal index of the first flanking atom of the loop
 		int ilfa; // internal index of the last flanking atom of the loop
@@ -1399,14 +1410,14 @@ int main( int argc, char * argv[] )
 		{
 			iffa = props[ifr-nflanks].k1; // first
 			ilfa = props[ilr+1+nflanks].k1 - 1; // last
-			printf("%s> Internal indices of first (%d) or last (%d) flanking atoms of the initial loop\n", prog, iffa, ilfa);
+			fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) flanking atoms of the initial loop\n", prog, iffa, ilfa);
 		}
 
 		// Saving Input Log File
 		sprintf(file_log,"%s_traj.log", name);
 		if( !(f_log=(FILE *)fopen(file_log,"w") ) )
 		{
-			printf("Sorry, unable to open LOG FILE: %s\n",file_log);
+			fprintf(stdout,"Sorry, unable to open LOG FILE: %s\n",file_log);
 			exit(1);
 		}
 		fprintf(f_log,"# %s> Welcome to %s v%s\n%s> COMMAND: ",prog,prog,version,prog);
@@ -1426,7 +1437,7 @@ int main( int argc, char * argv[] )
 
 		sprintf(dummy, "%s> Residues: %d  Dihedrals(DoFs): %d \n", prog, ilr-ifr+1, size);
 		fprintf(f_log, "%s", dummy); // Dump log info
-		printf("%s",dummy);
+		fprintf(stdout,"%s",dummy);
 
 		int ifa2; // internal index of the first mobile atom of the target loop
 		int ila2; // internal index of the last mobile atom of the target loop
@@ -1437,14 +1448,14 @@ int main( int argc, char * argv[] )
 			// Get the internal indices of first and last mobile atoms of the target loop (required to get "just loop contacts")
 			ifa2 = props2[ifr2].k1;
 			ila2 = props2[ilr2+1].k1 - 1;
-			printf("%s> Internal indices of first (%d) or last (%d) mobile atoms of the target loop\n", prog, ifa2, ila2);
+			fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) mobile atoms of the target loop\n", prog, ifa2, ila2);
 
 			// Get the internal indices of first and last flanking atoms of the target loop
 			if(nflanks > 0)
 			{
 				iffa2 = props2[ifr2-nflanks].k1;
 				ilfa2 = props2[ilr2+1+nflanks].k1 - 1;
-				printf("%s> Internal indices of first (%d) or last (%d) flanking atoms of the target loop\n", prog, iffa2, ilfa2);
+				fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) flanking atoms of the target loop\n", prog, iffa2, ilfa2);
 
 				// Computing RMSD of flanks
 				flank_rmsd = rmsd_flank(itermol, itertar, iffa, ifa, ila, ilfa, iffa2);
@@ -1452,7 +1463,7 @@ int main( int argc, char * argv[] )
 				// sprintf(dummy, "%s> Flanks RMSD with %d residues= %8f\n", prog, flank_rmsd, nflanks);
 				sprintf(dummy, "%s> Flanks RMSD with %d residues= %8f ", prog, nflanks, flank_rmsd);
 				fprintf(f_log, "%s", dummy); // Dump log info
-				printf("%s",dummy);
+				fprintf(stdout,"%s",dummy);
 			}
 
 			float flank_rmsd_min = 0.0; // Flanks RMSD upon alignment, if any
@@ -1500,7 +1511,7 @@ int main( int argc, char * argv[] )
 			{
 				sprintf(dummy, " Flanks Min_RMSD (%d residues)= %8f\n", nflanks, flank_rmsd_min);
 				fprintf(f_log, "%s", dummy); // Dump log info
-				printf("%s",dummy);
+				fprintf(stdout,"%s",dummy);
 			}
 		}
 
@@ -1510,25 +1521,25 @@ int main( int argc, char * argv[] )
 		pdbIter *iter = new pdbIter( mol, true, true, true, true ); // iter to screen fragments (residues)
 		num_res = iter->num_fragment();
 		num_atoms = iter->num_atom();
-		printf( "%s> Selected model residues: %d\n", prog, num_res );
-		printf( "%s> Selected model (pseudo)atoms: %d\n", prog, num_atoms );
+		fprintf( stdout, "%s> Selected model residues: %d\n", prog, num_res );
+		fprintf( stdout, "%s> Selected model (pseudo)atoms: %d\n", prog, num_atoms );
 
 		int reglen = loop_end - start + 1; // Number of loop residues (mobile)
 		if(props[ifr + reglen].nan != 1) // If not Proline
 			size++; // considering Ct-anchor Phi angle? (If Ct-anchor is Proline it does not have Phi)
 
-		if (imod >  (reglen)*2-6 ) {
-				fprintf(stderr, "\n Error selected mode %d must < %d --> Pro inside the loop \n\n", imod+1, (reglen)*2-6);
-				exit(1);
-		}
-
-
 
 		int nco = 6; // Number of (scalar) constraints
-		printf("%s> Number of residues in loop: %d\n", prog, reglen);
-		printf("%s> Number of pseudo-atoms in loop: %d\n", prog, num_atoms_loop);
-		printf("%s> Number of constraints: %d\n", prog, nco);
-		printf("%s> Number of free variables in loop: %d\n", prog, size);
+		fprintf( stdout, "%s> Number of residues in loop: %d\n", prog, reglen);
+		fprintf( stdout, "%s> Number of pseudo-atoms in loop: %d\n", prog, num_atoms_loop);
+		fprintf( stdout, "%s> Number of constraints: %d\n", prog, nco);
+		fprintf( stdout, "%s> Number of free variables in loop: %d\n", prog, size);
+
+		if (imod +1 >  size-nco ) {
+			fprintf(stderr, "%s> Error selected mode %d must <=  %d\n%s> Exit\n%s>\n",prog, imod+1, size-nco, prog, prog );
+			exit(1);
+		}
+
 
 
 		// Get masses array for eigenvector normalization
@@ -1544,27 +1555,27 @@ int main( int argc, char * argv[] )
 		if(nevec_fact == 0.0) // all modes requested
 		{
 			nevec = size - nco;
-			printf( "%s> All non-trivial modes will be computed: %d\n", prog, nevec);
+			fprintf( stdout, "%s> All non-trivial modes will be computed: %d\n", prog, nevec);
 		}
 		else if(nevec_fact >= 1.0) // number of modes
 		{
 			nevec = (int) nevec_fact;
-			printf( "%s> Range of computed modes: 1-%d\n", prog, nevec);
+			fprintf( stdout, "%s> Range of computed modes: 1-%d\n", prog, nevec);
 		}
 		else
 		{
 			nevec = (int) (nevec_fact * size);
-			printf( "%s> Range of computed modes: 1-%d (%.0f%)\n", prog, nevec, nevec_fact*100);
+			fprintf( stdout, "%s> Range of computed modes: 1-%d (%.0f%)\n", prog, nevec, nevec_fact*100);
 		}
 		// Checking
 		if(nevec > size)
 		{
-			printf("%s> Sorry, more eigenvectors requested (%d) than available (%d), forcing maximum.\n", prog, nevec, size);
+			fprintf( stdout, "%s> Sorry, more eigenvectors requested (%d) than available (%d), forcing maximum.\n", prog, nevec, size);
 			nevec = size;
 		}
 		else if(nevec <= 0) // checking
 		{
-			printf("%s> Error, invalid number of eigenvectors requested %d (%f)!\nForcing exit!\n", prog, nevec, nevec_fact);
+			fprintf( stdout, "%s> Error, invalid number of eigenvectors requested %d (%f)!\nForcing exit!\n", prog, nevec, nevec_fact);
 			exit(1);
 		}
 
@@ -1578,6 +1589,8 @@ int main( int argc, char * argv[] )
 
 		double *mass_matrix; // Kinetic energy matrix
 		double *hess_matrix; // Hessian matrix
+
+
 
 		// Get array of atomic masses from a Macromolecule iterator
 		float *masses; // masses array
@@ -1665,7 +1678,7 @@ int main( int argc, char * argv[] )
 
 			// Measure anchor drift
 			anchor_drift(iterini, itermol, props, ilr, &adist0, &aang0);
-			printf("%s> Initial anchor distance and angle: %f A and %f deg\n", prog, adist0, aang0);
+			fprintf( stdout, "%s> Initial anchor distance and angle: %f A and %f deg\n", prog, adist0, aang0);
 
 			//			mol->writePDB("mol.pdb");
 			//			molini->writePDB("molini.pdb");
@@ -1689,7 +1702,7 @@ int main( int argc, char * argv[] )
 				{
 					rmsd_old = 999999; // some high value required
 					if(verb > 1)
-					printf("> Initial structure dumped into Muli-PDB\n");
+						fprintf(stdout,"> Initial structure dumped into Muli-PDB\n");
 					mol->writeMloop(file_movie, 1, ifr-1, ilr+1, chain);
 				}
 				else
@@ -1707,12 +1720,12 @@ int main( int argc, char * argv[] )
 
 					float *coord; // (pseudo)atomic coordinates single row vector
 					if(verb > 1)
-						fprintf(stdout, "%s> Getting coordinates single row (pseudo-atom model)\n", prog);
+						fprintf(stdout,"%s> Getting coordinates single row (pseudo-atom model)\n", prog);
 					mol->coordMatrix( &coord );
 
 					trd *der; // Derivatives
 					if(verb > 1)
-						fprintf(stdout, "%s> Computing derivatives...\n", prog);
+						fprintf(stdout,"%s> Computing derivatives...\n", prog);
 					der = drdqC5x(coord, props, ifr, ilr, num_atoms_loop, size, model);
 
 					if(verb > 1)
@@ -1725,7 +1738,7 @@ int main( int argc, char * argv[] )
 
 					if( !(decint = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )  // Required for "realloc"
 					{
-						printf("Sorry, \"decint\" memory allocation failed!\n");
+						fprintf(stdout,"Sorry, \"decint\" memory allocation failed!\n");
 						exit(1);
 					}
 
@@ -1735,7 +1748,7 @@ int main( int argc, char * argv[] )
 					{
 						// Making Interacting Pair of (non-virtual) Atoms (ipas)
 						make_ipas_loop(itermol, itermol2, ifa, num_atoms_loop, cutoff_k0, &decint, &nipa);
-						// printf("%s> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", prog, nipa, cutoff_k0, cte_k0, x0);
+						// fprintf( stdout, "%s> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", prog, nipa, cutoff_k0, cte_k0, x0);
 						for(int i=0; i<nipa; i++)
 							decint[i].C = inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
 						break;
@@ -1745,7 +1758,7 @@ int main( int argc, char * argv[] )
 					{
 						// Making Interacting Pair of (non-virtual) Atoms (ipas)
 						make_ipas_loop(itermol, itermol2, ifa, num_atoms_loop, cutoff_k1, &decint, &nipa);
-						// printf("%s> Cutoff Distance (%d nipas) cutoff= %.1f, k= %f ", prog, nipa, cutoff_k1, cte_k1);
+						// fprintf( stdout, "%s> Cutoff Distance (%d nipas) cutoff= %.1f, k= %f ", prog, nipa, cutoff_k1, cte_k1);
 						for(int i=0; i<nipa; i++)
 							decint[i].C = cte_k1; // setting Force Constants
 						break;
@@ -1760,7 +1773,7 @@ int main( int argc, char * argv[] )
 					{
 						if( !(decint2 = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )
 						{
-							printf("Sorry, \"decint2\" memory allocation failed!\n");
+							fprintf(stdout,"Sorry, \"decint2\" memory allocation failed!\n");
 							exit(1);
 						}
 
@@ -1775,7 +1788,7 @@ int main( int argc, char * argv[] )
 								decint2[nipa2 - 1].d = decint[i].d; // set distance
 								decint2[nipa2 - 1].C = decint[i].C; // force constant will be set in the future
 							}
-						// printf("%s> %d initial contacts pruned to just %d\n", prog, nipa, nipa2);
+						// fprintf( stdout, "%s> %d initial contacts pruned to just %d\n", prog, nipa, nipa2);
 
 						// Just store the requested contacts
 						free(decint);
@@ -1787,7 +1800,7 @@ int main( int argc, char * argv[] )
 					case 1:
 						break;
 					default:
-						printf("%s> Please, introduce a valid Contact method to continue!!!\n\nForcing exit!\n\n", prog);
+						fprintf( stdout, "%s> Please, introduce a valid Contact method to continue!!!\n\nForcing exit!\n\n", prog);
 						exit(1);
 						break;
 					}
@@ -1795,23 +1808,22 @@ int main( int argc, char * argv[] )
 					// IPAs checking
 					if(verb > 2 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
 						for(int i=0; i<nipa; i++)
-							printf("ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
+							fprintf(stdout,"ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
 
 
 					// HESSIAN
 					if(verb > 1)
-						fprintf(stdout, "%s> Computing Hessian matrix (potential energy matrix)...\n", prog);
+						fprintf(stdout,"%s> Computing Hessian matrix (potential energy matrix)...\n", prog);
 					hess_matrix = hessianC5x(coord, der, props, decint, nipa, ifr, num_atoms_loop, size, nco);
 					//					if(scoring != 2) // "coord" required for Dihedrals RMSD
 					//						free(coord);
 
-					// Show Hessian matrix
-					if(verb > 1)
+					if(verb > 1) {
+						// Show Hessian matrix
 						show_matrix(hess_matrix, size + nco, "Hessian:", " %7.2f");
-
-					// Show Kinetic Energy matrix
-					if(verb > 1)
+						// Show Kinetic Energy matrix
 						show_matrix(mass_matrix, size + nco, "Kinetic:", " %7.0f");
+					}
 
 					// COMPUTING THE EIGENVECTORS AND EIGENVALUES
 					info = diag_dggev(eigval, eigvect, mass_matrix, hess_matrix, size, nco, &neig);
@@ -1828,15 +1840,15 @@ int main( int argc, char * argv[] )
 					// Some checking...
 					if( info ) // if info != 0
 					{
-						printf("\n%s> An error occured in the matrix diagonalization: %d\n", prog, info);
+						fprintf(stderr,"\n%s> An error occured in the matrix diagonalization: %d\n", prog, info);
 						exit(1);
 					}
 
 					if(verb > 1)
 					{
-						printf("%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
+						fprintf( stdout, "%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
 						show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
-						show_vectors(stdout,eigvect,size,neig,"Dumping Raw Eigenvectors:", " %5.2e");
+						show_vectors(stdout,eigvect,size,neig,"Dumping Raw Eigenvectors:"," %5.2e");
 					}
 
 					// Scale eigenvectors so that the maximum value of the components is "maxang"
@@ -1844,7 +1856,7 @@ int main( int argc, char * argv[] )
 					{
 						scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
 						if(verb > 1)
-							show_vectors(stdout,eigvect,size,neig,"Dumping Scaled EigenvectorsA:", " %5.2e");
+							show_vectors(stdout,eigvect,size,neig,"Dumping Scaled Eigenvectors:"," %5.2e");
 					}
 
 					// Compute the Cartesian eigenvectors from the Internal Coordinates eigenvectors
@@ -1854,13 +1866,14 @@ int main( int argc, char * argv[] )
 					{
 						// MON: neig should be nevec, shoudn't it?
 						cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3, masses_loop);
+						free(der); // Free obsolete derivatives
+
 						//			cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3);
 					}
-					free(der); // Free obsolete derivatives
 
 					//show_vectors(stdout,cevec,ncomps,neig,"Dumping Raw CC Eigenvectors:", " %5.2e");
 
-					//fprintf(stderr,"size= %d  nlrs= %d %d\n",size,nlrs, f);
+					// fprintf(stdout,"size= %d  nlrs= %d %d\n",size,nlrs, f);
 					//					exit(0);
 
 					// Store reference mode "refmode" to maintain the requested direction
@@ -1950,19 +1963,22 @@ int main( int argc, char * argv[] )
 						// Use selected mode as reference vector (only on the first iteration!)
 						if(f==0)
 						{
-							//fprintf(stderr,"hola1\n");
 							for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
 								refmode[ k ] = cevec[imod*ncomps + k ];
-							//fprintf(stderr,"hola2\n");
+							//fprintf(stdout,"hola2\n");
 
 							modref = vector_modulus( refmode, ncomps ); // Reference vector modulus
-							//fprintf(stderr,"hola3\n");
+							//fprintf(stdout,"hola3\n");
 
 						}
 
 					}
 
-					sprintf(text,"%s> %4d ", prog, f);
+
+					if (verb > 0) {
+						sprintf(text,"%s> %4d ", prog, f);
+						sprintf(dummy,"");
+					}
 
 					// Compute modes amplitudes into "alpha" array
 					double delta = 0.0;
@@ -1978,8 +1994,10 @@ int main( int argc, char * argv[] )
 							vdelta[n] = ddot*ddot; // Compute vectors with delta components
 							tdelta[n] += vdelta[n]; // Compute vectors with delta components
 							delta += vdelta[n];
-							sprintf(dummy, " %7.5f", vdelta[n]);
-							strcat(text, dummy);
+							if (verb > 0) {
+								sprintf(dummy, " %7.5f", vdelta[n]);
+								strcat(text, dummy);
+							}
 						}
 						// show_vector(stderr, vdelta, nevec, "", " %7.5f", false, false); //
 						break;
@@ -1993,10 +2011,13 @@ int main( int argc, char * argv[] )
 							ddot = dotprodnorm( refmode, eigvect + n*size, size, modref );
 							alpha[n] = ddot;
 							delta += ddot*ddot;
-							sprintf(dummy, " %7.5f", ddot*ddot);
-							strcat(text, dummy);
+							if (verb > 0) {
+								sprintf(dummy, " %7.5f", ddot*ddot);
+								strcat(text, dummy);
+							}
 						}
-						show_vector(stderr, alpha, nevec, "alph", " %6.3f");
+						if (verb > 2)
+							show_vector(stderr, alpha, nevec, "alph", " %6.3f");
 						break;
 					}
 					}
@@ -2005,15 +2026,19 @@ int main( int argc, char * argv[] )
 					//					show_vector(stderr, vdelta, nevec, "", " %7.5f", false, false); //
 
 					// WARNING: these "delta" elements are not "Square-rooted" as "delta"
-					sprintf(dummy, "  %4.2f %4.2f", sum_vector(vdelta, nevec/2), sum_vector(vdelta + (nevec/2), nevec - (nevec/2) )); // Total Delta
-					strcat(text, dummy);
-
 					delta = sqrt(delta);
-					sprintf(dummy, "  %7.5f", delta); // Total Delta
-					strcat(text, dummy);
-
 					if(f==0)
 						delta0 = delta; // store initial delta
+
+					if (verb > 0) {
+						// Total Delta
+						sprintf(dummy, "  %4.2f %4.2f", sum_vector(vdelta, nevec/2), (sum_vector(vdelta + (nevec/2), nevec - (nevec/2) )));
+						strcat(text, dummy);
+						sprintf(dummy, "  %7.5f", delta); // Total Delta
+						strcat(text, dummy);
+					}
+
+
 
 					// Show Cartesian normal mode in VMD
 					// sprintf(text, "%s_mode%02d.vmd", name, imod+1);
@@ -2062,20 +2087,21 @@ int main( int argc, char * argv[] )
 						move_loop_dihedral(itermol, ifr, ilr, props, mode, size, model, 1.0);
 						// mol->writeMPDB(file_movie, f+1); // Dump current conformation (frame) to a Multi-PDB file
 
-						// printf("follow_mode> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", rmsd - last_rmsd, delta_rmsd);
+						// fprintf(stdout,"follow_mode> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", rmsd - last_rmsd, delta_rmsd);
 						//						mol->writeMloop(file_movie, f+1, ifr-1, ilr+1, chain);
 					}
 
 					// Does some loop atom clash with its environment?
-					sprintf(dummy, " %d", clashed_loop( itermol, itermol2, ifa, num_atoms_loop, 1.0, ifa2) );
-					strcat(text, dummy);
+
 
 					// Compute anchor drift
 					anchor_drift(iterini, itermol, props, ilr, &adist, &aang);
 					ddrift = adist - adist0; // Distance increment wrt. initial distance
 					adrift = aang - aang0; // Angle increment wrt. initial angle
-					sprintf(dummy, " %6.3f %5.2f", ddrift, adrift);
-					strcat(text, dummy);
+					if (verb > 0) {
+						sprintf(dummy, " %6.3f %5.2f", ddrift, adrift);
+						strcat(text, dummy);
+					}
 
 					if(morph_switch) // Morphing protocol
 					{
@@ -2110,31 +2136,38 @@ int main( int argc, char * argv[] )
 						if(f==0)
 							rmsd0 = rmsd; // store initial RMSD
 
-						sprintf(dummy, " %7.4f", rmsd);
-						strcat(text, dummy);
-
-						if(verb > 0)
-						printf("%s\n", text); // Dump all output for current frame
+						if(verb > 0) {
+							//sprintf(dummy, " %d", clashed_loop( itermol, itermol2, ifa, num_atoms_loop, 1.0, ifa2) );
+							//strcat(text, dummy);
+							sprintf(dummy, " %7.4f", rmsd);
+							strcat(text, dummy);
+							fprintf(stdout, "%s\n", text); // Dump all output for current frame
+						}
 
 						fprintf(f_log, "%s\n", text); // Dump log info
 
 						// Morphing Convergence Test
 						if(rmsd_old - rmsd < rmsd_conv)
 						{
+
 							sprintf(dummy, "%s> Morphing convergence reached! dRMSD = %8f < %8f\n", prog, rmsd_old-rmsd, rmsd_conv);
 							fprintf(f_log, "%s", dummy); // Dump log info
-							printf("%s",dummy);
+							fprintf(stdout,"%s",dummy);
+
 							break;
 						}
 					}
 					else // Not-morphing protocol
 					{
 						rmsd = rmsd_loop(iterini, itermol, ifa, num_atoms_loop);
-						sprintf(dummy, " %7.4f", rmsd);
-						strcat(text, dummy);
 
-						if(verb > 0)
-						printf("%s\n", text); // Dump all output for current frame
+
+						if(verb > 0) {
+							sprintf(dummy, " %7.4f", rmsd);
+							strcat(text, dummy);
+							fprintf(stdout,"%s\n", text); // Dump all output for current frame
+						}
+
 						fprintf(f_log, "%s\n", text); // Dump log info
 
 						// Convergence test
@@ -2144,7 +2177,7 @@ int main( int argc, char * argv[] )
 						{
 							sprintf(dummy, "%s> Motion convergence reached! dRMSD = %8f < %8f\n", prog, rmsd-rmsd_old, rmsd_conv);
 							fprintf(f_log, "%s", dummy); // Dump log info
-							printf("%s",dummy);
+							fprintf(stdout,"%s",dummy);
 							break;
 						}
 
@@ -2152,7 +2185,7 @@ int main( int argc, char * argv[] )
 						{
 							sprintf(dummy, "%s> Motion convergence reached! RMSD = %8f > %8f target_rmsd\n", prog, rmsd, target_rmsd);
 							fprintf(f_log, "%s", dummy); // Dump log info
-							printf("%s",dummy);
+							fprintf(stdout,"%s",dummy);
 							break;
 						}
 					}
@@ -2164,7 +2197,8 @@ int main( int argc, char * argv[] )
 					// if(delta_rmsd < rmsd - last_rmsd)
 					if(delta_rmsd < fabsf(rmsd - last_rmsd) )
 					{
-						printf("%s> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", prog, rmsd - last_rmsd, delta_rmsd);
+						if(verb > 0)
+							fprintf( stdout, "%s> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", prog, rmsd - last_rmsd, delta_rmsd);
 						mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
 						last_rmsd = rmsd; // Keep last saved RMSD
 					}
@@ -2176,9 +2210,9 @@ int main( int argc, char * argv[] )
 				}
 
 				if(delta_rmsd != 999999)
-				printf("%s> Saving %s and %sdRMSD = %8f > %8f\n", prog, file_movie, file_final, rmsd - last_rmsd, delta_rmsd);
+					fprintf( stdout, "%s> Saving %s and %s dRMSD = %8f > %8f\n", prog, file_movie, file_final, rmsd - last_rmsd, delta_rmsd);
 				else
-					printf("%s> Final structure dumped into Muli-PDBs dRMSD = %8f\n", prog, rmsd );
+					fprintf( stdout, "%s> Final structure dumped into Muli-PDBs dRMSD = %8f\n", prog, rmsd );
 
 				mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
 
@@ -2198,7 +2232,7 @@ int main( int argc, char * argv[] )
 					sprintf(dummy, "%s> Morphing:  Initial_RMSD= %8f  Final_RMSD= %8f  Delta_RMSD= %8f  Initial_Delta= %8f  Motion= %8f\n",
 							prog, rmsd0, rmsd, rmsd0 - rmsd, delta0, (rmsd0 - rmsd)/ rmsd0);
 					fprintf(f_log, "%s", dummy); // Dump log info
-					printf("%s",dummy);
+					fprintf(stdout,"%s",dummy);
 					free(coord2);
 				}
 
@@ -2236,7 +2270,7 @@ int main( int argc, char * argv[] )
 				// Creating Elastic network
 				if( !(decint = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )  // Required for "realloc"
 				{
-					printf("Sorry, \"decint\" memory allocation failed!\n");
+					fprintf(stdout,"Sorry, \"decint\" memory allocation failed!\n");
 					exit(1);
 				}
 
@@ -2246,7 +2280,7 @@ int main( int argc, char * argv[] )
 				{
 					// Making Interacting Pair of (non-virtual) Atoms (ipas)
 					make_ipas_loop(itermol, itermol2, ifa, num_atoms_loop, cutoff_k0, &decint, &nipa);
-					// printf("%s> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", prog, nipa, cutoff_k0, cte_k0, x0);
+					// fprintf( stdout, "%s> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", prog, nipa, cutoff_k0, cte_k0, x0);
 					for(int i=0; i<nipa; i++)
 						decint[i].C = inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
 					break;
@@ -2256,7 +2290,7 @@ int main( int argc, char * argv[] )
 				{
 					// Making Interacting Pair of (non-virtual) Atoms (ipas)
 					make_ipas_loop(itermol, itermol2, ifa, num_atoms_loop, cutoff_k1, &decint, &nipa);
-					// printf("%s> Cutoff Distance (%d nipas) cutoff= %.1f, k= %f ", prog, nipa, cutoff_k1, cte_k1);
+					// fprintf( stdout, "%s> Cutoff Distance (%d nipas) cutoff= %.1f, k= %f ", prog, nipa, cutoff_k1, cte_k1);
 					for(int i=0; i<nipa; i++)
 						decint[i].C = cte_k1; // setting Force Constants
 					break;
@@ -2271,7 +2305,7 @@ int main( int argc, char * argv[] )
 				{
 					if( !(decint2 = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )
 					{
-						printf("Sorry, \"decint2\" memory allocation failed!\n");
+						fprintf(stdout,"Sorry, \"decint2\" memory allocation failed!\n");
 						exit(1);
 					}
 
@@ -2286,7 +2320,7 @@ int main( int argc, char * argv[] )
 							decint2[nipa2 - 1].d = decint[i].d; // set distance
 							decint2[nipa2 - 1].C = decint[i].C; // force constant will be set in the future
 						}
-					// printf("%s> %d initial contacts pruned to just %d\n", prog, nipa, nipa2);
+					// fprintf( stdout, "%s> %d initial contacts pruned to just %d\n", prog, nipa, nipa2);
 
 					// Just store the requested contacts
 					free(decint);
@@ -2300,7 +2334,7 @@ int main( int argc, char * argv[] )
 					break;
 
 				default:
-					printf("%s> Please, introduce a valid Contact method to continue!!!\n\nForcing exit!\n\n", prog);
+					fprintf( stdout, "%s> Please, introduce a valid Contact method to continue!!!\n\nForcing exit!\n\n", prog);
 					exit(1);
 					break;
 				}
@@ -2308,7 +2342,7 @@ int main( int argc, char * argv[] )
 				// IPAs checking
 				if(verb > 2 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
 					for(int i=0; i<nipa; i++)
-						printf("ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
+						fprintf(stdout,"ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
 
 				if(verb > 1)
 					fprintf(stdout, "%s> Computing Hessian matrix (potential energy matrix)...\n", prog);
@@ -2335,13 +2369,13 @@ int main( int argc, char * argv[] )
 				// Some checking...
 				if( info ) // if info != 0
 				{
-					printf("\n%s> An error occured in the matrix diagonalization: %d\n", prog, info);
+					fprintf(stdout,"\n%s> An error occured in the matrix diagonalization: %d\n", prog, info);
 					exit(1);
 				}
 
 				if(verb > 1)
 				{
-					printf("%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
+					fprintf( stdout, "%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
 					show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
 					show_vectors(stdout,eigvect,size,neig,"Dumping Raw Eigenvectors:", " %5.2e");
 				}
@@ -2362,9 +2396,9 @@ int main( int argc, char * argv[] )
 				free(der); // Free obsolete derivatives
 
 				// Show Cartesian normal mode in VMD
-//				 sprintf(text, "%s_mode%02d.vmd", name, imod+1);
-//					printf("%s> saving %s\n", prog, text);
-//				  show_cartmode(coord, cevec, props, ifr, num_atoms_loop + 3, text, imod);
+				//				 sprintf(text, "%s_mode%02d.vmd", name, imod+1);
+				//					fprintf( stdout, "%s> saving %s\n", prog, text);
+				//				  show_cartmode(coord, cevec, props, ifr, num_atoms_loop + 3, text, imod);
 
 				// sampling
 				for(int f = 0; f < nsamples; f++) // Generate N-samples (frames)
@@ -2415,7 +2449,7 @@ int main( int argc, char * argv[] )
 					rmsd = rmsd_loop(iterini, itermol, ifa, num_atoms_loop);
 					sprintf(dummy, " %7.4f", rmsd);
 					strcat(text, dummy);
-					printf("%s\n", text); // Dump all output for current frame
+					fprintf(stdout,"%s\n", text); // Dump all output for current frame
 				}
 
 				free(cevec); // free obsolete Cartesian modes
@@ -2435,7 +2469,7 @@ int main( int argc, char * argv[] )
 				fprintf(stderr,"model= %d  type= %d  ifa= %d  ifr= %d  ilr= %d  na= %d  size= %d  nco= %d  cutoff= %f  neig= %d\n", model, type, ifa, ifr, ilr, num_atoms_loop, size, nco, cutoff_k0, neig);
 				// exit(0);
 
-				printf("%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
+				fprintf( stdout, "%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
 				// show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
 				// show_vectors(stdout,eigvect,size,neig,"Dumping Raw IC Eigenvectors:", " %5.2e");
 
@@ -2543,7 +2577,7 @@ int main( int argc, char * argv[] )
 		//
 		//			sprintf(dummy, "%s> Morphing: Initial_RMSD= %8f  Final_RMSD= %8f  Delta_RMSD= %8f\n", prog, rmsd0, rmsd, rmsd0 - rmsd);
 		//			fprintf(f_log, "%s", dummy); // Dump log info
-		//			printf("%s",dummy);
+		//			fprintf(stdout,"%s",dummy);
 		//			free(coord2);
 		//		}
 
@@ -2690,7 +2724,7 @@ trd *drdqC5x(float *coord, tri *props, int ifr, int ilr, int nla, int size, int 
 		CBindex = 3;
 
 	if(verb)
-		printf("drdqC5x> ifpa: %d  ilpa: %d  CBindex: %d\n",ifpa,ilpa,CBindex);
+		fprintf(stdout,"drdqC5x> ifpa: %d  ilpa: %d  CBindex: %d\n",ifpa,ilpa,CBindex);
 
 	// Allocate derivatives
 	trd *der = (trd *) malloc( sized * size * sizeof(trd) );
@@ -2719,14 +2753,14 @@ trd *drdqC5x(float *coord, tri *props, int ifr, int ilr, int nla, int size, int 
 		k2 = k1 + props[i].nat-1;
 
 		if(verb)
-			printf("drdqC5x> i=%d  nan=%d  nat=%d  k1= %d  k2= %d\n",i,props[i].nan,props[i].nat,k1,k2);
+			fprintf(stdout,"drdqC5x> i=%d  nan=%d  nat=%d  k1= %d  k2= %d\n",i,props[i].nan,props[i].nat,k1,k2);
 
 		// Derivatives of PHI dihedral angles
 		// ----------------------------------
 		if(props[i].nan != 1) // NOT Proline, i.e. if it has just one mobile angle (PHI).
 		{   // q_j = phi_i
 			if(verb)
-				printf("drdqC5x> residue_i= %3d  dihedral_j= %3d  --> PHI\n",i,j);
+				fprintf(stdout,"drdqC5x> residue_i= %3d  dihedral_j= %3d  --> PHI\n",i,j);
 
 			// Compute:   e = r_CA - r_N    and    y = r_N
 			for(c=0; c<3; c++)
@@ -2778,7 +2812,7 @@ trd *drdqC5x(float *coord, tri *props, int ifr, int ilr, int nla, int size, int 
 		if(i != ifr+reglen && props[i].nan == 3) // If it has CHI and it is not the Ct anchor
 		{   // q_j = chi_i
 			if(verb)
-				printf("drdqC5x> residue_i= %3d  dihedral_j= %3d  --> CHI\n",i,j);
+				fprintf(stdout,"drdqC5x> residue_i= %3d  dihedral_j= %3d  --> CHI\n",i,j);
 
 			// Compute:   e = r_CB - r_CA    and    y = r_CA
 			for(c=0; c<3; c++)
@@ -2832,7 +2866,7 @@ trd *drdqC5x(float *coord, tri *props, int ifr, int ilr, int nla, int size, int 
 		if(i != ifr + reglen) // if not Ct-anchor, i.e. if it has mobile PSI angle
 		{   // q_j = psi_i
 			if(verb)
-				printf("drdqC5x> residue_i= %3d  dihedral_j= %3d  --> PSI\n",i,j);
+				fprintf(stdout,"drdqC5x> residue_i= %3d  dihedral_j= %3d  --> PSI\n",i,j);
 
 			// Compute:   e = r_C - r_CA    and    y = r_CA
 			for(c=0; c<3; c++)
@@ -2895,7 +2929,7 @@ trd *drdqC5x(float *coord, tri *props, int ifr, int ilr, int nla, int size, int 
 	}
 
 	if(verb)
-		printf("Number of dihedral variables (Phi,Psi,Chi) %d\n", j);
+		fprintf(stdout,"Number of dihedral variables (Phi,Psi,Chi) %d\n", j);
 
 	return der; // Return derivatives
 }
@@ -3154,6 +3188,8 @@ double *hessianC5x(float *coord, trd *der, tri *props, twid *decint, int nipa, i
 }
 
 
+
+
 int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hess_matrix, int size, int nco, int *neig)
 {
 	bool verb = false;
@@ -3359,13 +3395,13 @@ int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hes
 	*neig = 0;
 	for(n=0; n<sizex; n++)
 	{
-		if(verb)
-			printf("ar= %.10e, ai= %.10e, b= %.10e\n",alphar[n], alphai[n], beta[n]);
+		if(verb>2)
+			fprintf(stdout,"ar= %.10e, ai= %.10e, b= %.10e\n",alphar[n], alphai[n], beta[n]);
 
 		if(beta[n]!=0.0 && alphai[n]==0.0) // alphai == 0 means NO imaginary eigenvalue
 		{
-			if(verb)
-				printf("ar= %.10e, ai= %.10e, b= %.10e, lambda= %.10e\n",alphar[n], alphai[n], beta[n], alphar[n]/beta[n]);
+			if(verb>2)
+				fprintf(stdout,"ar= %.10e, ai= %.10e, b= %.10e, lambda= %.10e\n",alphar[n], alphai[n], beta[n], alphar[n]/beta[n]);
 
 			eigval[*neig] = alphar[n] / beta[n];
 
@@ -3398,12 +3434,12 @@ int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hes
 		//		fprintf(stderr,"\n");
 	}
 
-	// sort by increasing eigenvalue
+	// sort by increasing eigenvalue, it was decreasing Pablo 2020
 	for(m=0;m<(*neig)-1;m++)
 	{
 		msi = m*size;
 		for(n=m+1;n<(*neig);n++)
-			if(eigval[m]>eigval[n])
+			if(eigval[m] < eigval[n])
 			{
 				SWAPPING(eigval[m], eigval[n], double);
 				nsi = n*size;
@@ -3465,7 +3501,7 @@ void diag_dsygvx(double *hess_matrix,double *mass_matrix,double *eigval, int siz
 			eigval, p_evec, &ldz, work, &lwork, iwork,
 			ifail, &info);
 
-	printf("Msg(diag_dsygvx): %d eigenvectors found! info= %d",m,info);
+	fprintf(stdout,"Msg(diag_dsygvx): %d eigenvectors found! info= %d",m,info);
 
 	// Outputting as usual... (eigenvectors inside hess_matrix)
 	for(int i=0; i<size*evec_size; i++)
@@ -4491,7 +4527,7 @@ void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu,
 		resn = resnum_from_resname( res->getName() );
 
 		if(debug)
-			printf("%4d Residue %s  nan= %d\n",j, res->getName(), props[iter->pos_fragment].nan);
+			fprintf(stdout,"%4d Residue %s  nan= %d\n",j, res->getName(), props[iter->pos_fragment].nan);
 
 		// PHI (No first, No PRO)
 		if( iter->pos_fragment != 0 && (strcmp(res->getName(), "PRO") != 0) )
@@ -4522,7 +4558,7 @@ void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu,
 			// d_rotmat(uu[j2] * step / (float) maxrot, e1, Ri);
 
 			if(debug)
-				printf("%4d PHI (Updating Ti & Si) angle[%3d]= %f\n",j,j2,uu[j2]*step);
+				fprintf(stdout,"%4d PHI (Updating Ti & Si) angle[%3d]= %f\n",j,j2,uu[j2]*step);
 
 			// Updating acummulated rotation matrix (Si). (Rotational part of Mi)
 			mult3(Ri,Si,dummy); // Si = Ri x S(i-1)
@@ -4597,7 +4633,7 @@ void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu,
 			// d_rotmat(uu[j2] * step / (float) maxrot, e1, Ri);
 
 			if(debug)
-				printf("%4d CHI (Updating Ti & Si) angle[%3d]= %f\n",j,j2,uu[j2]*step);
+				fprintf(stdout,"%4d CHI (Updating Ti & Si) angle[%3d]= %f\n",j,j2,uu[j2]*step);
 
 			// NOT-Updating acummulated rotation matrix (Si). (Rotational part of Mi)
 			// We will rotate CHI after PHI rotation-traslation is applied!
@@ -4660,7 +4696,7 @@ void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu,
 			// d_rotmat(uu[j2] * step / (float) maxrot, e1, Ri);
 
 			if(debug)
-				printf("%4d PSI (Updating Ti & Si) angle[%3d]= %f\n",j,j2,uu[j2]*step);
+				fprintf(stdout,"%4d PSI (Updating Ti & Si) angle[%3d]= %f\n",j,j2,uu[j2]*step);
 
 			// Updating acummulated rotation matrix (Si). (Rotational part of Mi)
 			mult3(Ri,Si,dummy); // Si = Ri x S(i-1)
@@ -4732,7 +4768,7 @@ void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cut
 	// iterB = new pdbIter(mol);
 
 	if(debug)
-		printf("Msg(make_ipas_new): Creating Interacting Pairs of pseudo-Atoms (IPAs) list.\n");
+		fprintf(stdout,"Msg(make_ipas_new): Creating Interacting Pairs of pseudo-Atoms (IPAs) list.\n");
 
 	for(iterA->pos_atom = ifpa; iterA->pos_atom < ifpa + nla; iterA->next_atom() )
 	{
@@ -5118,8 +5154,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			// Convergence check
 			if(rmsd > rmsd_conv)
 			{
-
-				printf("follow_mode> Motion convergence reached! dRMSD = %8f > %8f\n", rmsd, rmsd_conv);
+				fprintf(stdout,"follow_mode> Motion convergence reached! dRMSD = %8f > %8f\n", rmsd, rmsd_conv);
 				mol->writeMloop(file_movie, (*p_fi)++, ifr-1, ilr+1, chain);
 				// exit(0);
 				break;
@@ -5128,7 +5163,8 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			// Write just the indicated loop (from the index of first residue "ifr" to index of last residue "lfr") into a Multi-PDB
 			if(delta_rmsd < rmsd - last_rmsd)
 			{
-				printf("follow_mode> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", rmsd - last_rmsd, delta_rmsd);
+				if(verb > 0)
+					fprintf(stdout,"%d> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", prog, rmsd - last_rmsd, delta_rmsd);
 				mol->writeMloop(file_movie, (*p_fi)++, ifr-1, ilr+1, chain);
 				last_rmsd = rmsd; // Keep last saved RMSD
 			}
@@ -5140,7 +5176,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			//			sprintf(dummy, " %6.3f %5.2f", ddrift, adrift);
 			//			strcat(text, dummy);
 
-			// printf("%s\n", text); // Dump all output for current frame
+			// fprintf(stdout,"%s\n", text); // Dump all output for current frame
 			// rmsd_old = rmsd;
 		}
 
@@ -5148,7 +5184,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		//				if(!mr_switch && (rmsd - rmsd_old < rmsd_conv || clashed_loop( itermol, itermol2, ifa, na, 1.0)))
 
 
-		//		printf("%s\n", text); // Dump all output for current frame
+		//		fprintf(stdout,"%s\n", text); // Dump all output for current frame
 		//		fprintf(stdout, "\n");
 
 		//	Update the "refmode" and "modref" with the current most overlapping mode
@@ -5257,21 +5293,21 @@ int nma_loop(Macromolecule *mol, int model, int type, tri *props, float *masses,
 	// Allocate "decint" to store the contacts list (ipas-list)
 	if( !(decint = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )  // Required for "realloc"
 	{
-		printf("Sorry, \"decint\" memory allocation failed!\n");
+		fprintf(stdout,"Sorry, \"decint\" memory allocation failed!\n");
 		exit(1);
 	}
 
 	// INVERSE EXPONENTIAL (power of distance for contact matrix)
 	// Making Interacting Pair of (non-virtual) Atoms (ipas)
 	make_ipas_loop(itermol, itermol2, ifa, na, cutoff, &decint, &nipa); // Updating Elastic network
-	// printf("%s> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", prog, nipa, cutoff_k0, cte_k0, x0);
+	// fprintf( stdout, "%s> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", prog, nipa, cutoff_k0, cte_k0, x0);
 	for(int i=0; i<nipa; i++)
 		decint[i].C = inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
 
 	// IPAs checking
 	if(debug) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
 		for(int i=0; i<nipa; i++)
-			printf("ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
+			fprintf(stdout,"ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
 
 	if(debug)
 		fprintf(stdout, "%s> Computing Hessian matrix (potential energy matrix)...\n", prog);
@@ -5312,13 +5348,13 @@ int nma_loop(Macromolecule *mol, int model, int type, tri *props, float *masses,
 	// Some checking...
 	if( info ) // if info != 0
 	{
-		printf("\nnma_loop> An error occured in the matrix diagonalization: %d\n", info);
+		fprintf(stdout,"\nnma_loop> An error occured in the matrix diagonalization: %d\n", info);
 		exit(1);
 	}
 
 	if(debug)
 	{
-		printf("%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
+		fprintf( stdout, "%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
 		show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
 		show_vectors(stdout,eigvect,size,neig,"Dumping Raw Eigenvectors:", " %5.2e");
 	}
@@ -5388,7 +5424,7 @@ int readTextLines(char *file, char ***p_lines, int linelength) // Reading all ro
 
 	while( fgets(myline,1024,f) )
 	{
-		//printf("%s\n",myline);
+		//fprintf(stdout,"%s\n",myline);
 		if(myline[0] != '#')
 		{
 			// Memory allocations...

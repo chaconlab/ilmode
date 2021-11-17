@@ -1216,7 +1216,9 @@ bool Macromolecule::writeMloop( char *name, int n, int ifr, int ilr, char chain)
 //			sprintf( line, fmt, a->getPdbSerial(), a->getPdbName(), res->getName(),
 //					cad->getName() [0],res->getIdNumber()/*res->get_pos()*/,res->get_letter(), pos[0], pos[1], pos[2], a->getPdbocc(), a->getPdbfact() );
 			sprintf( line, fmt, a->getPdbSerial(), a->getPdbName(), res->getName(),
-					chain, res->getIdNumber()/*res->get_pos()*/,res->get_letter(), pos[0], pos[1], pos[2], a->getPdbocc(), a->getPdbfact() );
+//					chain, res->getIdNumber()/*res->get_pos()*/,res->get_letter(), pos[0], pos[1], pos[2], a->getPdbocc(), a->getPdbfact() );
+	        // remove  Occupancy annd Bfactor
+					chain, res->getIdNumber()/*res->get_pos()*/,res->get_letter(), pos[0], pos[1], pos[2], 0.0, 0.0 );
 
 			fputs( line, file );
 
