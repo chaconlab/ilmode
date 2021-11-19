@@ -3434,12 +3434,12 @@ int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hes
 		//		fprintf(stderr,"\n");
 	}
 
-	// sort by increasing eigenvalue, it was decreasing Pablo 2020
+	// sort by increasing eigenvalue
 	for(m=0;m<(*neig)-1;m++)
 	{
 		msi = m*size;
 		for(n=m+1;n<(*neig);n++)
-			if(eigval[m] < eigval[n])
+			if(eigval[m] > eigval[n])
 			{
 				SWAPPING(eigval[m], eigval[n], double);
 				nsi = n*size;
