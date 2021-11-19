@@ -7,9 +7,9 @@ Moving closed-loops with Normal Mode Analysis with constraints in internal coord
 
 Move a closed-loop along a given mode direction till reach a give rmsd from the inital conformation: 
 <pre>
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 20 -o _mod1F -m 2 -s 0 -a  1  --rmsd 3.0 --drmsd 0.25 
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 20 -o _mod1B -m 2 -s 0 -a -1  --rmsd 3.0 --drmsd 0.25   
-../scripts/renum_tr.pl 3hsz_mod1F_traj.pdb 3hsz_mod1B_traj.pdb > 3hsz_mod20.pdb
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _mod1F -m 2 -s 0 -a  1  --rmsd 3.0 --drmsd 0.25 
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _mod1B -m 2 -s 0 -a -1  --rmsd 3.0 --drmsd 0.25   
+../scripts/renum_tr.pl 3hsz_mod1F_traj.pdb 3hsz_mod1B_traj.pdb > 3hsz_mod1.pdb
 </pre>
 The first command moves forward (-a 1) the 81-93 loop until the rmsd from the initial position is > 3.0 Å (--rmsd 3.0). Every 0.25Å away(--drmsd 0.25) from the initial pose the moved loop coordinates are saved in the 3hsz_mod1F_traj.pdb trajectory file.  The second command does the same but backward, and the final one generates a forward-backward trajectory like this: 
  
