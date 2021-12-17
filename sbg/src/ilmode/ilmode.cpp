@@ -1,11 +1,10 @@
 //============================================================================
 // Name        : ilmode.cpp
 // Author      : Mon
-// Version     : 1.01
+// Version     : 1.2
 // Copyright   : Your copyright notice
 // Description : Hello World in C++, Ansi-style
 //============================================================================
-
 #include <stdio.h>
 #include "cmdl/CmdLine.h" // Command line parser
 #include "libnma/include/libnma_misc.h" // Mon's NMA Internal Coordinates related library
@@ -13,6 +12,10 @@
 #include "libnma/include/libnma_time.h" // Real-timer (Santi's)
 #include "libnma/include/libnma_matrix.h" // Some vector and matrix algebra routines
 #include "libpdb/include/Rotamer.h"
+
+char version[]="1.2"; // version code
+char prog[]="ilmode"; // program name
+
 
 // Input data simple structure
 typedef struct
@@ -41,8 +44,7 @@ typedef struct
 
 
 /*==============================================================================================*/
-char version[]="1.10"; // version code
-char prog[]="ilmode"; // program name
+
 
 // Input variables
 char file_pdb[FILE_NAME]; // Initial PDB
@@ -65,7 +67,8 @@ int saved_files_len; // store the "saved_files" array current length
 int nevec = -1; // number of eigenvectors to be computed (set by parser)
 int imod = 0; // Index of mode to be shown (0,1,...,N-1)
 int strategy = 0; // Sampling strategy (0=raw sampling for selected mode "i", 1= hyper-square sampling, etc...
-int nsamples = 1000; // Number of samples for selected strategy
+int nsamples = 100;   // Number of samples for selected strategy
+int nsteps   = 1000;   // Number of samples for selected strategy
 float rmsd_conv = 1e-4; // RMSD convergence threshold
 float nevec_fact = -1; // % of eigenvectors to be computed (set by parser)
 bool debug = false; // Debug mode
@@ -112,6 +115,7 @@ double maxang = 0.0; // Maximum angular increment to normalize modes [deg]
 double dc; // Characteristic distance factor for Deformability computations (see: hardy and compute_def functions in libnma_def.cpp)
 char chain = '*'; // Chain ID for initial PDB
 char chain2 = '*'; // Chain ID for target PDB
+int check_model;
 
 
 
@@ -219,15 +223,25 @@ float dotprodnorm(float *v, float *w, int size, float mv = 0.0, float mw = 0.0);
 //	masses_sqrt --> Array of the square root of the atomic masses (one per loop atom)
 double *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, float *masses_sqrt = NULL);
 
-void move_loop_linear(char *file, Macromolecule *mol, double *cevec, int imod, int ifpa, int nla, int steps=10, float factor=1.0);
+void move_loop_linear_steps(char *file, Macromolecule *mol, double *cevec, int imod, int ifpa, int nla, int steps=10, float factor=1.0);
+
+void move_loop_linear(pdbIter *iter, double *cevec, int imod, int ifpa, int nla);
+void move_loop_linear_factor(pdbIter *iter, double *cevec, int imod, int ifpa, int nla, float factor);
+
 
 void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu, int size, int model, float step);
 
 float rmsd_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla);
 
+float rmsd_loop_residue(pdbIter *iter, pdbIter *iter2, int ifpr, int ifr2, int nla);
+
+
+
 float rmsd_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, int ifpa2);
 
 float rmsd_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, double *delta);
+
+
 
 // Get dihedral angles (an array) from a continuous Macromolecule loop
 // WARNING! Dihedral angles order: Psi_NtAnchor, Phi_1st, Psi_1st, Phi_2nd, Psi_2nd, ... , Phi_Nth, Psi_Nth, Phi_CtAnchor
@@ -351,6 +365,8 @@ void get_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord);
 
 // Set loop coordinates from a pre-allocated "coord" array (intended for copy & paste or coordinates backup)
 void set_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord);
+
+void update_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord);
 
 // Show square matrix
 void show_matrix(double *matrix, int size, char *name = "Showing matrix:", char *fmt = " %6.2f");
@@ -524,8 +540,11 @@ int main( int argc, char * argv[] )
 		ValueArg<float> RMSD("r","rmsd", "Target RMSD for mode-following strategies (default=2).",false,2.0,"float");
 		cmd.add( RMSD );
 
-		ValueArg<int> NSamples("","ns", "Number of samples for selected strategy (default=1000).",false,1000,"int");
+		ValueArg<int> NSamples("","nr", "Number of runs/frames for -s 2  (default=1000)",false,1000,"int");
 		cmd.add( NSamples );
+
+		ValueArg<int> NSteps("","ns", "Max number of sampling steps (default=1000).",false,1000,"int");
+		cmd.add( NSteps );
 
 		ValueArg<int> Strategy("s","strategy","Sampling strategy direction (default=2)\n"
 				"    0= Single mode direction defined by -i\n"
@@ -544,7 +563,7 @@ int main( int argc, char * argv[] )
 		ValueArg<std::string> Name("o","name", "Output files basename (default=ilmode).",false,prog,"string");
 		cmd.add( Name );
 
-		ValueArg<int> Model("m","model", "Coarse-Grained model: 0=CA, 1=C5, 2=Heavy-Atom, 3=C,CA,C (default=2)",false,2,"int");
+		ValueArg<int> Model("m","model", "Coarse-Grained model: 0=CA, 1=C5, 2=Heavy-Atom, 3=N,CA,C (default=2)",false,2,"int");
 		cmd.add( Model );
 
 		ValueArg<char> Chain2("","chain2", "Chain ID for the target PDB (default=first chain)",false,1,"int");
@@ -629,6 +648,12 @@ int main( int argc, char * argv[] )
 
 		imod = IndexMode.getValue() - 1; // indices must begin in "0"
 
+		if (imod < 0 ) // checking
+		{
+			fprintf(stdout,"%s>  Invalid mode number (%d) > 1\nForcing exit!\n",prog,imod);
+			exit(1);
+		}
+
 
 
 
@@ -685,6 +710,8 @@ int main( int argc, char * argv[] )
 
 
 		nsamples = NSamples.getValue(); // Number of samples for selected strategy
+		nsteps = NSteps.getValue(); // Number of samples for selected strategy
+
 		target_rmsd = RMSD.getValue(); // Target RMSD for mode-following strategies
 		delta_rmsd = dRMSD.getValue(); // Delta RMSD in mode-following strategies
 
@@ -878,6 +905,7 @@ int main( int argc, char * argv[] )
 	{
 		float delta0; // Initial Delta
 		float rmsd0; // Initial RMSD
+		float rmsd0_ncac; // Initial RMSD
 		float rmsd; // Current RMSD
 
 		// Generate basename for current "p"
@@ -923,7 +951,17 @@ int main( int argc, char * argv[] )
 		// Formating Initial PDB first
 		if(verb > 1)
 			fprintf( stdout, "%s> Formatting residues order and checking for missing atoms\n", prog );
-		if(molr->format_residues(false,model) > 0)
+
+		if (model==0) check_model=0;
+		if (model==3) check_model=0;
+		if (model==1) check_model=1;
+		if (model==2) check_model=2;
+
+		fprintf( stdout, "%s> Model  %d %d\n", prog, model, check_model );
+
+
+
+		if(molr->format_residues(false,check_model) > 0)
 		{
 			if(skip_missingatoms) // skip missing atoms
 				fprintf( stdout, "%s> Warning, missing atom(s) found! Be aware of wrong results!\n", prog );
@@ -975,7 +1013,16 @@ int main( int argc, char * argv[] )
 			// Formating TARGET PDB first
 			if(verb > 1)
 				fprintf( stdout, "%s> Formatting residues order and checking for missing atoms\n", prog );
-			if(molr2->format_residues(false,model) > 0)
+
+			if (model==0) check_model=0;
+			if (model==3) check_model=0;
+			if (model==1) check_model=1;
+			if (model==2) check_model=2;
+
+			fprintf( stdout, "%s> Model  %d %d\n", prog, model, check_model );
+
+
+			if(molr2->format_residues(false,check_model) > 0)
 			{
 				if(skip_missingatoms) // skip missing atoms
 					fprintf( stdout, "%s> Warning, missing atom(s) found! Be aware of wrong results!\n", prog );
@@ -1103,6 +1150,7 @@ int main( int argc, char * argv[] )
 			strcpy(saved_files + saved_files_len, text);
 		}
 
+
 		// Initializing some internal coords. related residue properties
 		// (# atoms, # units, # internal coordinates, etc...)
 		tri *props,*props2;
@@ -1164,7 +1212,10 @@ int main( int argc, char * argv[] )
 			// Formating residues of all Loops at once
 			if(debug)
 				fprintf( stdout, "%s> Formatting Loops Multi-PDB residues order and checking for missing atoms, model= %d\n", prog, model );
-			if(loopsr->format_residues(false,model) > 0)
+
+
+
+			if(loopsr->format_residues(false,check_model) > 0)
 			{
 				if(skip_missingatoms) // skip missing atoms
 					fprintf( stdout, "%s> Warning, missing atom(s) found in loops Multi-PDB! Be aware of wrong results!\n", prog );
@@ -1259,6 +1310,7 @@ int main( int argc, char * argv[] )
 		}
 		// END of loops multi-pdb stuff...
 
+
 		// Compute internal residue indices of initial loop boundaries (NOTE: CONSIDER CHAIN-ID SOME DAY...)
 		int ifr = -1; // internal index of the first mobile residue of the initial loop
 		int ilr = -1; // internal index of the last mobile residue of the initial loop
@@ -1275,7 +1327,7 @@ int main( int argc, char * argv[] )
 
 			if(chain == ch->getName()[0])
 			{
-
+				fprintf( stdout, "%s> Sequence: ",prog);
 				for( iter->pos_fragment = 0; !iter->gend_fragment(); iter->next_fragment() ) // screen residues
 				{
 					res = (Residue *) iter->get_fragment();
@@ -1285,6 +1337,7 @@ int main( int argc, char * argv[] )
 					{
 						num_atoms_loop += props[res_index].nat;
 						size += props[res_index].nan;
+						fprintf(stdout,"%c",AA[resnum_from_resname( res->getName() )].aa_name1);
 					}
 
 					// fprintf(stdout,"%d  nid= %d\n",iter->pos_fragment,res->getIdNumber());
@@ -1305,6 +1358,7 @@ int main( int argc, char * argv[] )
 
 					res_index++; // update absolute residue index
 				}
+
 			}
 			else
 				res_index += iter->num_fragment();
@@ -1312,6 +1366,8 @@ int main( int argc, char * argv[] )
 			delete iter;
 		}
 		delete iter_ch;
+
+		fprintf( stdout, "\n");
 
 		fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) mobile residues of the initial loop (chain %c)\n", prog, ifr, ilr, chain);
 
@@ -1461,7 +1517,7 @@ int main( int argc, char * argv[] )
 				flank_rmsd = rmsd_flank(itermol, itertar, iffa, ifa, ila, ilfa, iffa2);
 				// fprintf(stderr,"Flanks RMSD: %f\n", flank_rmsd);
 				// sprintf(dummy, "%s> Flanks RMSD with %d residues= %8f\n", prog, flank_rmsd, nflanks);
-				sprintf(dummy, "%s> Flanks RMSD with %d residues= %8f ", prog, nflanks, flank_rmsd);
+				sprintf(dummy, "%s> Flanks RMSD with %d residues= %8.2f ", prog, nflanks, flank_rmsd);
 				fprintf(f_log, "%s", dummy); // Dump log info
 				fprintf(stdout,"%s",dummy);
 			}
@@ -1509,7 +1565,7 @@ int main( int argc, char * argv[] )
 
 			if(nflanks > 0)
 			{
-				sprintf(dummy, " Flanks Min_RMSD (%d residues)= %8f\n", nflanks, flank_rmsd_min);
+				sprintf(dummy, " Flanks Min_RMSD (%d residues)= %8.2f\n", nflanks, flank_rmsd_min);
 				fprintf(f_log, "%s", dummy); // Dump log info
 				fprintf(stdout,"%s",dummy);
 			}
@@ -1696,7 +1752,6 @@ int main( int argc, char * argv[] )
 				double modcurr; // Current vector modulus
 				float rmsd_old; // Old RMSD
 				float last_rmsd = 0; // RMSD of last saved structure
-				int f;
 
 				if(morph_switch)
 				{
@@ -1708,7 +1763,9 @@ int main( int argc, char * argv[] )
 				else
 					rmsd_old = 0.0; // zero value required
 
-				for(f = 0; f < nsamples; f++) // Generate N-samples (frames)
+				float *coord; // (pseudo)atomic coordinates single row vector
+
+				for(int f = 0; f < nsteps; f++) // Generate N-samples (frames)
 				{
 					// Initialize Eigenvalues
 					for(int i=0; i<size+nco; i++)
@@ -1718,10 +1775,17 @@ int main( int argc, char * argv[] )
 					for(int i=0; i<(size+nco)*size; i++)
 						eigvect[i] = 0.0;
 
-					float *coord; // (pseudo)atomic coordinates single row vector
 					if(verb > 1)
 						fprintf(stdout,"%s> Getting coordinates single row (pseudo-atom model)\n", prog);
-					mol->coordMatrix( &coord );
+
+					if (f==0)
+						mol->coordMatrix( &coord );
+					else {   // just update coord instead initializes
+						//fprintf(stderr, "---> %d %d %d  %d\n", props[ifr].k1, num_atoms_loop +3, props[ilr].k1,props[ilr+1].k1-1 );
+
+						update_loop_coords(itermol, props[ifr].k1, num_atoms_loop +3, coord);
+					}
+
 
 					trd *der; // Derivatives
 					if(verb > 1)
@@ -1833,14 +1897,14 @@ int main( int argc, char * argv[] )
 					// MON: check this, seems unnecessary...
 					if(neig < nevec)
 					{
-						fprintf(stderr,"Error: f=%d More eigenverctors requested (%d) than available (%d), forcing exit!\n",f,nevec,neig);
-						exit(1);
+						fprintf(stderr,"Warning more eigenvectors requested (%d) than available (%d)\n",nevec,neig);
+						// exit(1);
 					}
 
 					// Some checking...
 					if( info ) // if info != 0
 					{
-						fprintf(stderr,"\n%s> An error occured in the matrix diagonalization: %d\n", prog, info);
+						fprintf(stderr,"\n%s> An error occurred in the matrix diagonalization: %d\n", prog, info);
 						exit(1);
 					}
 
@@ -1924,7 +1988,7 @@ int main( int argc, char * argv[] )
 						}
 						}
 					}  // end morph switch
-					else if(mr_switch) // Monte-Carlo
+					else if(mr_switch) //  multiple mode following.
 					{
 
 						//				// Generate some random vector in CC
@@ -1937,7 +2001,7 @@ int main( int argc, char * argv[] )
 						//					refmode[ k ] = cevec[ranm * ncomps + k ];
 						//				modref = vector_modulus( refmode, ncomps ); // Reference vector modulus
 
-						// Use selected mode as reference vector (only on the first iteration!)
+						// Use selected random combinations of mode as reference vector (only on the first iteration!)
 						if(f==0)
 						{
 							// Reset "refmode"
@@ -1957,7 +2021,7 @@ int main( int argc, char * argv[] )
 							modref = vector_modulus( refmode, ncomps ); // Reference vector modulus
 						}
 					}
-					else // Mode following
+					else // Single mode following
 					{
 
 						// Use selected mode as reference vector (only on the first iteration!)
@@ -2077,7 +2141,47 @@ int main( int argc, char * argv[] )
 						if(maxang != 0.0)
 							scale_vectors(mode, 3 * (num_atoms_loop + 3), 1, fabs(maxang) * M_PI / 180.0); // Scale current merged mode
 
-						move_loop_linear(file_movie, mol, mode, 0, ifa, num_atoms_loop + 3, 1, 1.0); // including Ct-anchor (+3) for checking purposes...
+						if (true) {
+							move_loop_linear(itermol, mode, 0, ifa, num_atoms_loop + 3); // including Ct-anchor (+3) for checking purposes...
+						}
+						else  {
+
+							// apply lienar in steps
+							int num_steps=100000;
+
+							move_loop_linear_factor(itermol, mode, 0, ifa, num_atoms_loop + 3,1.0/num_steps); // including Ct-anchor (+3) for checking purposes...
+
+							update_loop_coords(itermol, props[ifr].k1, num_atoms_loop+3, coord);
+
+							if (f==0)
+								mol->writeMloop("linear_traj.pdb", 1, ifr-1, ilr+1, chain);
+
+							for(int s = 2; s < num_steps; s++)
+							{
+								der = drdqC5x(coord, props, ifr, ilr, num_atoms_loop, size, model);
+								free(cevec);
+								cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3, masses_loop);
+								free(der); // Free obsolete derivatives
+								// normalization
+								for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
+									mode[ k ] = 0.0; // zero initialization
+								for(int n=0; n<nevec; n++)
+								{
+									double ampn = pow(alpha[n],2);
+									if(alpha[n] < 0.0) // Reverse n-th mode
+										ampn *= -1.0; // Reverse current CC mode to maintain initial direction
+									for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
+										mode[ k ] += cevec[ n * ncomps + k ] * ampn;
+								}
+								scale_vectors(mode, 3 * (num_atoms_loop + 3), 1, fabs(maxang) * M_PI / 180.0); // Scale current merged mode
+								move_loop_linear_factor(itermol, mode, 0, ifa, num_atoms_loop +3 ,1.0/num_steps); // including Ct-anchor (+3) for checking purposes...
+								update_loop_coords(itermol, props[ifr].k1, num_atoms_loop +3 , coord);
+								if (f==0)
+									mol->writeMloop("linear_traj.pdb", s, ifr-1, ilr+1, chain);
+
+							}
+						}
+						// move_loop_linear_steps(file_movie, mol, mode, 0, ifa, num_atoms_loop + 3, 1, 1.0); // including Ct-anchor (+3) for checking purposes...
 					}
 					else // dihedral motion
 					{
@@ -2109,20 +2213,6 @@ int main( int argc, char * argv[] )
 						{
 						case 1: // Cartesian coordinates RMSD
 							rmsd = rmsd_loop(itermol, itertar, ifa, num_atoms_loop, ifa2);
-
-							//								// MON: testing something
-							//								loop_dihedrals(coord, props, ifr, ilr, size, model, type, &dhs); // Get dihedral angles arrays
-							//								show_vector(stderr, dhs, size, "dhs: ", " %6.1f");
-							//								loop_dihedrals(coord2, props2, ifr2, ilr2, size, model, type, &dhs2);
-							//								show_vector(stderr, dhs2, size, "dhs2:", " %6.1f");
-							//								// Element-wise difference between dihedral angle [deg] arrays "v" and "w" (d = v - w) taking into account rotation
-							//								dihedrals_diff(dhs2, dhs, refmode, size); // Element-wise difference between vectors "v" and "w" (d = v - w)
-							//								show_vector(stderr, refmode, size, "ref: ", " %6.1f");
-							//								modref = vector_modulus( refmode, size ); // Reference vector modulus
-							//								// rmsd = vector_rmsd(refmode, size);
-							//								rmsd = modref;
-							//								fprintf(stderr,"dihedral_diff_module= %f  dihedral_rmsd= %f\n",modref,rmsd);
-
 							break;
 
 						case 2: // Dihedral angles RMSD
@@ -2133,9 +2223,10 @@ int main( int argc, char * argv[] )
 							break;
 						}
 
-						if(f==0)
+						if(f==0) {
 							rmsd0 = rmsd; // store initial RMSD
-
+							rmsd0_ncac = rmsd_loop_residue(itermol, itertar, ifr, ifr2, nlrs );
+						}
 						if(verb > 0) {
 							//sprintf(dummy, " %d", clashed_loop( itermol, itermol2, ifa, num_atoms_loop, 1.0, ifa2) );
 							//strcat(text, dummy);
@@ -2219,22 +2310,23 @@ int main( int argc, char * argv[] )
 				if(morph_switch) // Morphing protocol
 				{
 					mol->writePDB(file_final); // Write the morphed loop together with the complete PDB structure
+					float rmsd_ncac = rmsd_loop_residue(itermol, itertar, ifr, ifr2, nlrs );
 
-					// Scale "tdelta" so that the maximum value of the components is 1.0
+					if (verb>1) {
 					scale_vectors(tdelta, nevec, 1, 1.0);
-
 					// Dump "tdelta"
 					fprintf(stdout, "%s> %5s", prog, "Total"); // Dump log info
 					show_vector(stdout, tdelta, nevec, "", " %7.5f", false, true);
 					fprintf(f_log, "%s> %5s", prog, "Total"); // Dump log info
 					show_vector(f_log, tdelta, nevec, "", " %7.5f", false, true);
-
-					sprintf(dummy, "%s> Morphing:  Initial_RMSD= %8f  Final_RMSD= %8f  Delta_RMSD= %8f  Initial_Delta= %8f  Motion= %8f\n",
-							prog, rmsd0, rmsd, rmsd0 - rmsd, delta0, (rmsd0 - rmsd)/ rmsd0);
+                    }
+					sprintf(dummy, "%s> Morphing:  Initial_RMSD= %-8.2f NCAC %-8.2f Final_RMSD= %-8.2f NCAC %-8.2f Delta_RMSD= %-8.2f  Initial_Delta= %-8.2f  Motion= %-8.2f\n",
+							prog, rmsd0, rmsd0_ncac, rmsd, rmsd_ncac, rmsd0 - rmsd, delta0, (rmsd0 - rmsd)/ rmsd0);
 					fprintf(f_log, "%s", dummy); // Dump log info
 					fprintf(stdout,"%s",dummy);
 					free(coord2);
 				}
+				free(coord);
 
 			}
 			break;
@@ -2391,8 +2483,6 @@ int main( int argc, char * argv[] )
 				// Compute the Cartesian eigenvectors from the Internal Coordinates eigenvectors
 				double *cevec; // Cartesian eigenvectors
 				cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3);
-
-
 				free(der); // Free obsolete derivatives
 
 				// Show Cartesian normal mode in VMD
@@ -2401,7 +2491,7 @@ int main( int argc, char * argv[] )
 				//				  show_cartmode(coord, cevec, props, ifr, num_atoms_loop + 3, text, imod);
 
 				// sampling
-				for(int f = 0; f < nsamples; f++) // Generate N-samples (frames)
+				for(int f = 0; f < nsteps; f++) // Generate N-samples (frames)
 				{
 					// Initialize current "merged" mode
 					for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
@@ -2434,7 +2524,9 @@ int main( int argc, char * argv[] )
 					// Generate trajectory
 					if(linear_switch) // linear motion
 					{
-						move_loop_linear(file_movie, mol, mode, 0, ifa, num_atoms_loop + 3, 1, 1.0); // including Ct-anchor (+3) for checking purposes...
+						move_loop_linear(itermol, mode, 0, ifa, num_atoms_loop); // including Ct-anchor (+3) for checking purposes...
+
+						// move_loop_linear_steps(file_movie, mol, mode, 0, ifa, num_atoms_loop + 3, 1, 1.0); // including Ct-anchor (+3) for checking purposes...
 					}
 					else // dihedral motion
 					{
@@ -2533,7 +2625,7 @@ int main( int argc, char * argv[] )
 					// MON: check the "1000" below... use some PARSER input???
 
 					// Mode following routine with target RMSD
-					follow_mode(refmode, mol, model, type, props, masses, masses_loop, ifa, ifr, ilr, num_atoms_loop, size, nco, maxang, cutoff_k0, 1000,
+					follow_mode(refmode, mol, model, type, props, masses, masses_loop, ifa, ifr, ilr, num_atoms_loop, size, nco, maxang, cutoff_k0, nsteps,
 							eigval, eigvect, target_rmsd, iterini, file_movie, delta_rmsd, &fi, chain, false);
 
 					// mol->writeMPDB(file_movie, f+2); // Dump current conformation (frame) to a Multi-PDB file
@@ -2544,6 +2636,9 @@ int main( int argc, char * argv[] )
 					// Set initial loop coordinates to prevent unwanted distortions
 					set_loop_coords(itermol, ifa, num_atoms_loop, coordini);
 				}
+
+				fprintf( stdout, "%s> Saving %d runs in %s every %f Δrmsd\n", prog,  nsamples, file_movie, delta_rmsd);
+
 
 				free(coordini);
 				free(cevec);
@@ -2567,7 +2662,7 @@ int main( int argc, char * argv[] )
 		delete iterini;
 		delete itermol;
 		delete itermol2;
-
+		delete itertar;
 		delete molini;
 		delete molr;
 
@@ -3837,7 +3932,7 @@ double *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, float *
 					v[1] += der[kp*size + j].y * eigvect[i*size + j];
 					v[2] += der[kp*size + j].z * eigvect[i*size + j];
 				}
-				Aop[i * 3 * nla + 3*kp ] = masses_sqrt[kp] * v[0];
+				Aop[i * 3 * nla + 3*kp ]    =  masses_sqrt[kp] * v[0];
 				Aop[i * 3 * nla + 3*kp + 1] = masses_sqrt[kp] * v[1];
 				Aop[i * 3 * nla + 3*kp + 2] = masses_sqrt[kp] * v[2];
 			}
@@ -3847,9 +3942,72 @@ double *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, float *
 	return Aop;
 }
 
+void move_loop_linear(pdbIter *iter, double *cevec, int imod, int ifpa, int nla)
+
+{
+	Atom *at;
 
 
-void move_loop_linear(char *file, Macromolecule *mol, double *cevec, int imod, int ifpa, int nla, int steps, float factor)
+	// Generate a linear trajectory, including Ct-anchor for checking purposes...
+	Tcoor pos;
+
+
+
+	int kp = 0;
+	for( iter->pos_atom = ifpa; iter->pos_atom < ifpa + nla; iter->next_atom() ) // just screen mobile loop atoms
+	{
+		// Get PDB residue index
+		at = (Atom *) iter->get_atom();
+		at->getPosition(pos);
+
+		// Apply position increment
+		pos[0] += cevec[imod*3*nla+3*kp  ];
+		pos[1] += cevec[imod*3*nla+3*kp+1];
+		pos[2] += cevec[imod*3*nla+3*kp+2];
+
+		// Set position
+		at->setPosition(pos);
+
+		kp++; // Update atom index
+	}
+
+
+}
+
+
+void move_loop_linear_factor(pdbIter *iter, double *cevec, int imod, int ifpa, int nla, float factor)
+
+{
+	Atom *at;
+
+
+	// Generate a linear trajectory, including Ct-anchor for checking purposes...
+	Tcoor pos;
+
+
+
+	int kp = 0;
+	for( iter->pos_atom = ifpa; iter->pos_atom < ifpa + nla; iter->next_atom() ) // just screen mobile loop atoms
+	{
+		// Get PDB residue index
+		at = (Atom *) iter->get_atom();
+		at->getPosition(pos);
+
+		// Apply position increment
+		pos[0] += cevec[imod*3*nla+3*kp  ] *factor;
+		pos[1] += cevec[imod*3*nla+3*kp+1] *factor;
+		pos[2] += cevec[imod*3*nla+3*kp+2] *factor;
+
+		// Set position
+		at->setPosition(pos);
+
+		kp++; // Update atom index
+	}
+
+
+}
+
+void move_loop_linear_steps(char *file, Macromolecule *mol, double *cevec, int imod, int ifpa, int nla, int steps, float factor)
 {
 	Atom *at;
 
@@ -3902,6 +4060,49 @@ float rmsd_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla)
 
 	return sqrt(rmsd / nla);
 }
+
+float rmsd_loop_residue(pdbIter *iter, pdbIter *iter2, int ifr, int ifr2, int nla)
+{
+
+	Tcoor at, at2;
+	double rmsd = 0.0;
+	Residue *res, *res2;
+	pdbIter *itera, *iterb;
+
+	//fprintf(stderr,"--> %d %d %d\n", ifr,ifr2,nla );
+
+	iter2->pos_fragment = ifr2;
+
+	for( iter->pos_fragment = ifr; iter->pos_fragment <= ifr + nla; iter->next_fragment(),iter2->next_fragment()  ) // just screen mobile loop fragments
+	{
+		res =  ( Residue * ) iter->get_fragment();
+		res2 = ( Residue * ) iter2->get_fragment();
+
+		itera = new pdbIter( res );
+		iterb = new pdbIter( res2 );
+
+		for(int i=0; i<3; i++) {
+			itera->pos_atom = i;
+			( itera->get_atom() )->getPosition( at );
+			iterb->pos_atom = i;
+			( iterb->get_atom() )->getPosition( at2 );
+			//fprintf(stderr,"--> %d %f %f %f %f %f %f   \n", iter->pos_fragment, at[0],at[1],at[2],at2[0],at2[1],at2[2]);
+
+			rmsd += pow(at[0] - at2[0], 2) + pow(at[1] - at2[1], 2) + pow(at[2] - at2[2], 2);
+
+		}
+		itera->~pdbIter(); // delete iterator
+		iterb->~pdbIter(); // delete iterator
+
+
+	}
+
+	return sqrt(rmsd / (nla*3));
+
+}
+
+
+
 
 float rmsd_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, int ifpa2)
 {
@@ -4845,7 +5046,7 @@ float *get_masses_loop(pdbIter *iter, int ifpa, int nla, bool sqrt)
 void anchor_drift(pdbIter *iter, pdbIter *iter2, tri *props, int ilr, float *p_dist, float *p_ang)
 {
 	Atom *at;
-	Tcoor n, c, ca;
+	Tcoor n, c, ca, c2, c3;
 
 	int ifalr = props[ilr].k1; // Index of the First Atom of the Last Residue
 	int ifaa = props[ilr+1].k1; // Index of the First Atom of the Anchor
@@ -4862,6 +5063,17 @@ void anchor_drift(pdbIter *iter, pdbIter *iter2, tri *props, int ilr, float *p_d
 	// Get coordinates of the CA atom from Ct-anchor of reference macromolecule
 	iter->pos_atom = ifaa + 1; // CA-atom index
 	(iter->get_atom())->getPosition(ca);
+
+	// compute drift...
+	/*
+	iter->pos_atom = ifaa +2 ;
+	(iter->get_atom())->getPosition(c2);
+    iter2->pos_atom = ifaa + 2; // C-atom index
+    (iter2->get_atom())->getPosition(c3);
+    fprintf(stdout,"drift %f C atom from last residue\n", sqrtf( powf(c2[0]-c3[0],2) + powf(c2[1]-c3[1],2) + powf(c2[2]-c3[2],2) ) );
+    fprintf(stdout,"C1 %f %f %f\n", c2[0], c2[1], c2[2] );
+    fprintf(stdout,"C  %f %f %f\n", c3[0], c3[1], c3[2] );
+	 */
 
 	// Compute inter-atomic distance
 	*p_dist = sqrtf( powf(n[0]-c[0],2) + powf(n[1]-c[1],2) + powf(n[2]-c[2],2) );
@@ -4908,7 +5120,7 @@ void anchor_drift(pdbIter *iter, pdbIter *iter2, tri *props, int ilr, float *p_d
 //	update --> (OPTIONAL) if "true", the "refmode" will be updated by current most overlapping mode
 //	RETURN --> Number of non-null eigenpairs
 int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *props, float *masses, float *masses_loop, int ifa, int ifr, int ilr,
-		int na, int size, int nco, double maxang, float cutoff, int nsamples, double *eigval, double *eigvect, float rmsd_conv, pdbIter *iterini,
+		int na, int size, int nco, double maxang, float cutoff, int nsteps, double *eigval, double *eigvect, float rmsd_conv, pdbIter *iterini,
 		char *file_movie, float delta_rmsd, int *p_fi, char chain, bool update)
 {
 	bool debug = false; // dump debug info
@@ -4954,7 +5166,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 	float rmsd; // Current RMSD
 	float last_rmsd = 0.0; // Last saved RMSD
 
-	for(int f = 0; f < nsamples; f++) // Generate N-samples (frames) (up to some maximum number of samples)
+	for(int f = 0; f < nsteps; f++) // some maximum number of sampling steps
 	{
 		// Initialize Eigenvalues
 		for(int i=0; i<size+nco; i++)
@@ -4964,10 +5176,17 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		for(int i=0; i<(size+nco)*size; i++)
 			eigvect[i] = 0.0;
 
-		float *coord; // (pseudo)atomic coordinates single row vector
 		if(debug)
 			fprintf(stderr, "follow_mode> Getting coordinates single row (pseudo-atom model)\n");
-		mol->coordMatrix( &coord );
+
+		if (f==0)
+			mol->coordMatrix( &coord );
+		else {   // just update coord instead initializes
+
+			update_loop_coords(itermol, props[ifr].k1, na, coord);
+		}
+
+
 
 		trd *der; // Derivatives
 		if(debug)
@@ -5009,7 +5228,6 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		if(debug)
 			fprintf(stderr, "follow_mode> Computing Hessian matrix (potential energy matrix)...\n");
 		hess_matrix = hessianC5x(coord, der, props, decint, nipa, ifr, na, size, nco);
-		free(coord); // free obsolete raw coordinates
 		free(decint); // free obsolete elastic network
 
 		if(debug)
@@ -5036,8 +5254,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		// MON: check this, seems unnecessary...
 		if(neig < nevec)
 		{
-			fprintf(stderr,"Error: f=%d More eigenvectors requested (%d) than available (%d), forcing exit!\n",f,nevec,neig);
-			exit(1);
+			fprintf(stderr," Warning more eigenvectors requested (%d) than available (%d), forcing exit!\n",nevec,neig);
 		}
 
 		if(debug)
@@ -5060,16 +5277,6 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		cevec = ic2cart(eigvect, neig, der, size, na + 3, masses_loop);
 		free(der); // Free obsolete derivatives
 
-		// Show Cartesian normal mode in VMD
-		// sprintf(text, "%s_mode%02d.vmd", name, imod+1);
-		// show_cartmode(coord, cevec, props, ifr, na + 3, text, imod);
-
-		// Compute modes amplitudes into "alpha" array
-		//		double delta = 0.0;
-		//		double ddot;
-
-		//		show_vector(stdout, refmode, ncomps, "refmode:", " %5.2f", false, true);
-		// show_vector(stdout, refmode+12, 12, "refmode:", " %5.2f", false, true);
 
 		//		sprintf(text,"follow_mode> %4d ", f);
 		if(verb > 0)
@@ -5086,45 +5293,9 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			show_vector(stdout, delta, nevec, "", " %6.4f", false, false);
 
 		// Compute "delta" value
-
 		if(verb > 0)
 			fprintf(stdout, "  %7.5f", sqrt( sum_vector(delta, nevec) ));
 
-		//		// Compute and show delta
-		//		sprintf(dummy, "  %7.5f", get_delta(alpha, nevec) );
-		//		strcat(text, dummy);
-		//
-		//		for(int n=0; n<nevec; n++)
-		//		{
-		//			ddot = dotprodnorm( refmode, cevec + n*ncomps, ncomps, modref );
-		//			alpha[n] = ddot;
-		//			delta += ddot*ddot;
-		//			sprintf(dummy, " %7.5f", ddot*ddot);
-		//			strcat(text, dummy);
-		//		}
-		//		sprintf(dummy, "  %7.5f", sqrt(delta));
-		//		strcat(text, dummy);
-		//
-		//		// Initialize current mode
-		//		for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
-		//			mode[ k ] = 0.0; // zero initialization
-		//
-		//		double ampn; // Amplitude of n-th mode
-		//		for(int n=0; n<nevec; n++)
-		//		{
-		//			ampn = pow(alpha[n],2); // Amplitude of n-th mode
-		//			// fprintf(stderr, "n= %d  ampn= %f\n", n, ampn);
-		//
-		//			if(alpha[n] < 0.0) // Reverse n-th mode
-		//				ampn *= -1.0; // Reverse current CC mode to maintain initial direction
-		//
-		//			// Generate "merged" Dihedral-coordinates mode for motion
-		//			for(int k = 0; k < size; k++) // Mon added the +3, watch out!
-		//				mode[ k ] += eigvect[ n * size + k ] * ampn;
-		//		}
-
-		// Compute IC "mode" from "eigvect" IC eigenvectors and "alpha" and "delta" arrays
-		//		make_mode(alpha, delta, eigvect, mode, nevec, size);
 
 		// Using Alpha
 		for(int k = 0; k < size; k++)
@@ -5217,6 +5388,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		free(cevec); // free obsolete modes
 	}
 
+	free(coord); // free obsolete raw coordinates
 	free(mode); // free mode
 	free(alpha);
 	free(delta);
@@ -5382,6 +5554,31 @@ void get_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord)
 		i++; // loop atom local index
 	}
 }
+
+
+
+
+void update_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord)
+{
+	Tcoor pos;
+	int i = 0;
+
+	for( iter->pos_atom = ifpa; iter->pos_atom < ifpa + nla; iter->next_atom() ) // just screen mobile loop atoms
+	{
+		// Get atom position
+		( iter->get_atom() )->getPosition(pos);
+		int index = iter->pos_atom*3;
+		//fprintf(stdout,"%s> N %d  %f %f %f \n", prog, index,  coord[index], coord[index + 1], coord[index + 2]);
+		//fprintf(stdout,"%s> N %d  %f %f %f \n", prog, index,  pos[0], pos[1], pos[2]);
+		coord[index]     = pos[0];
+		coord[index + 1] = pos[1];
+		coord[index + 2] = pos[2];
+	}
+}
+
+
+
+
 
 // Set loop coordinates from a pre-allocated "coord" array (intended for copy & paste or coordinates backup)
 void set_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord)
