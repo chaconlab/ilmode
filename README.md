@@ -63,14 +63,13 @@ Finally, there is not restricition in where to put the restraints and you can mo
 ../ilmode/scripts/renum_tr.pl 4ake_mod1HF_traj.pdb 4ake_mod1HB_traj.pdb >  4ake_mod1H.pdb
 </pre>
 
-<video  width="320px" height="175px"  src="https://user-images.githubusercontent.com/19269061/146780609-61c13d3d-aae1-48f7-b414-11745a0cd71b.mp4" autoplay="true" loop="true" controls="controls" >
+<video  width="250px" height="100px"  src="https://user-images.githubusercontent.com/19269061/146780609-61c13d3d-aae1-48f7-b414-11745a0cd71b.mp4" autoplay="true" loop="true" controls="controls" >
 </video>
 
 
 ### Morphing ###
 
-Here we model the transition between two loop conformations deviated 13.0Å away using only the local modes computed by our approach. To this end,   
-the initial structure (3hsz.pdb) is iteratively deformed along the lowest modes while the root mean square deviation (RMSD) to a target structure (3ht0.pdb) is minimized. 
+Here we model the transition between two loop conformations deviated 13.0Å away using only the local modes computed by our approach. To this end, the initial structure (3hsz.pdb) is iteratively deformed along the lowest modes while the root mean square deviation (RMSD) to a target structure (3ht0.pdb) is minimized. 
 
 <pre>
 ilmode 3hsz.pdb  81 93 --chain A -t 3ht0.pdb -m 2 --skip_missingatoms -a 1 -i 1  --ns 2000  --drmsd 0.25 -o  _morph  -x --flanks 2 --aliflanks
@@ -83,5 +82,5 @@ Initial rmsd=13.0Å             | Trajectory               | Final   rmsd=1.0�
 Despite the only dihedral angles being moved we practically have reached the target structure. This and other examples illustrates the potential of this reduced loop-closed modal space for the conformational search. Here you can find another example:  
 
 <pre>
-ilmode 3irs.pdb  66 76 --chain C -t 3k4w.pdb -m 1 -a 1  --ns 2000 --flanks 2 --aliflanks --drmsd 0.25 -x 
+ilmode 3irs.pdb  66 76 --chain C -t 3k4w.pdb -m 2 -a 1 --drmsd 0.25 -x 
 </pre>
