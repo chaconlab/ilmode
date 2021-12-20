@@ -63,7 +63,7 @@ Finally, there is not restricition in where to put the restraints and you can mo
 ../ilmode/scripts/renum_tr.pl 4ake_mod1HF_traj.pdb 4ake_mod1HB_traj.pdb >  4ake_mod1H.pdb
 </pre>
 
-<video  width="250px" height="100px"  src="https://user-images.githubusercontent.com/19269061/146780609-61c13d3d-aae1-48f7-b414-11745a0cd71b.mp4" autoplay="true" loop="true" controls="controls" >
+<video    src="https://user-images.githubusercontent.com/19269061/146780609-61c13d3d-aae1-48f7-b414-11745a0cd71b.mp4" autoplay="true" loop="true" controls="controls" >
 </video>
 
 
