@@ -55,6 +55,18 @@ finally, you can have in the trajectory file all the intermediate conformations 
 
 <img src="images/rmsd3b.jpg" alt="alt text" width="320">
 
+
+Finally, there is not restricition in where to put the restraints and you can move any segment of the protein. Here we move sub-domain of the adenilate kinase protein using:
+<pre>
+../sbg/bin/ilmode 4ake.pdb  109 162 --chain A -i 1 -o _mod1HF -m 2  -a  2  --rmsd 3.0 --drmsd 0.25  --seed 399495214
+../sbg/bin/ilmode 4ake.pdb  109 162 --chain A -i 1 -o _mod1HB -m 2  -a -2  --rmsd 3.0 --drmsd 0.25  --seed 399495214
+../ilmode/scripts/renum_tr.pl 4ake_mod1HF_traj.pdb 4ake_mod1HB_traj.pdb >  4ake_mod1H.pdb
+</pre>
+
+<video  width="320px" height="175px"  src="https://user-images.githubusercontent.com/19269061/146780609-61c13d3d-aae1-48f7-b414-11745a0cd71b.mp4" autoplay="true" loop="true" controls="controls" >
+</video>
+
+
 ### Morphing ###
 
 Here we model the transition between two loop conformations deviated 13.0Å away using only the local modes computed by our approach. To this end,   
