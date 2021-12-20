@@ -72,7 +72,7 @@ Finally, there is not restricition in where to put the restraints and you can mo
 Here we model the transition between two loop conformations deviated 13.0Å away using only the local modes computed by our approach. To this end, the initial structure (3hsz.pdb) is iteratively deformed along the lowest modes while the root mean square deviation (RMSD) to a target structure (3ht0.pdb) is minimized. 
 
 <pre>
-ilmode 3hsz.pdb  81 93 --chain A -t 3ht0.pdb -m 2 --skip_missingatoms -a 1 -i 1  --ns 2000  --drmsd 0.25 -o  _morph  -x --flanks 2 --aliflanks
+ilmode 3hsz.pdb  81 93 --chain A -t 3ht0.pdb -m 2 --skip_missingatoms -a 1 -i 1  --drmsd 0.25  -x  -o  _morph
 </pre>
 
 Initial rmsd=13.0Å             | Trajectory               | Final   rmsd=1.0Å              
@@ -82,5 +82,5 @@ Initial rmsd=13.0Å             | Trajectory               | Final   rmsd=1.0�
 Despite the only dihedral angles being moved we practically have reached the target structure. This and other examples illustrates the potential of this reduced loop-closed modal space for the conformational search. Here you can find another example:  
 
 <pre>
-ilmode 3irs.pdb  66 76 --chain C -t 3k4w.pdb -m 2 -a 1 --drmsd 0.25 -x 
+ilmode 3irs.pdb  66 76 --chain C -t 3k4w.pdb -m 2 -a 1 --drmsd 0.25 -x  -o  _morph
 </pre>
