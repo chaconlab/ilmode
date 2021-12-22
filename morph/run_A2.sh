@@ -4,9 +4,10 @@
 prog="ilmode"
 ntoff=0  # N-terminal offset from "start" residue in input file
 ctoff=0  # C-terminal offset from "end" residue in input file
-
-suff="_aF0"  # general output suffix
-opts="-m 2 --skip_missingatoms -a 1 --drmsd 0.25"
+suff="_aF2"  # general output suffix (bt "both terminals", nt "n-terminal", etc...)
+opts="-m 2 --skip_missingatoms -a 1 --ns 10000 --flanks 2 --aliflanks --drmsd 0.25"
+#suff="_aF2x"  # general output suffix (bt "both terminals", nt "n-terminal", etc...)
+#opts="-m 2 -x --skip_missingatoms -a 1 --ns 10000 --flanks 2 --aliflanks --drmsd 0.25"
 
 stat="stat$suff.txt"  # general output statistics file
 echo "# Morphing                 Delta0    RmsdA   RmsdA2    RmsdI    RmsdINCAC   RmsdF    RmsdNCAC    RmsdD   Motion N_res N_dh" > $stat  # dump statistics file header
@@ -66,10 +67,13 @@ do
     rmsdD=`echo $line | awk '{print $12}'`
     delta0=`echo $line | awk '{print $14}'`
     motion=`echo $line | awk '{print $16}'`
+    line=`grep "ilmode> Flanks RMSD" $log`
+    rmsdA=`echo $line | awk '{print $7}'`
+    rmsdA2=`echo $line | awk '{print $12}'`
     line=`grep "ilmode> Residues:" $log`
     nres=`echo $line | awk '{print $3}'`
     ndh=`echo $line | awk '{print $5}'`
-    echo "$log2  $delta0 $rmsd0 $rmsdF $rmsd0NCAC $rmsdNCAC $rmsdD $motion $nres $ndh " >> $stat  # dump statistics (append)
+    echo "$log2  $rmsd0 $rmsdF $rmsd0NCAC $rmsdNCAC $nres $ndh $delta0 $motion    $rmsdA $rmsdA2" >> $stat  # dump statistics (append)
    fi
   done
  done
@@ -80,23 +84,23 @@ done
 stat0=`basename $stat .txt`
 stat2=$stat0'A0S.txt'
 head -n 1 $stat > $stat2
-statext.pl $stat 1 10 1 all 1 >> $stat2
+statext.pl $stat 1 12 1 all 1 >> $stat2
 echo -e "Results full set --> $stat2"
 
 # Averages for RmsdI > 1
 stat3=$stat0'A1'.txt
-awk '{if($5>1) print $0}' $stat > $stat3
+awk '{if($4>1) print $0}' $stat > $stat3
 stat3b=$stat0'A1S.txt'
 head -n 1 $stat > $stat3b
-statext.pl $stat3 1 10 1 all 1 >> $stat3b
+statext.pl $stat3 1 12 1 all 1 >> $stat3b
 echo -e "Results RmsdI>1 --> $stat3b"
 
 # Averages for RmsdI > 2
 stat4=$stat0'A2'.txt
-awk '{if($5>2) print $0}' $stat > $stat4
+awk '{if($4>2) print $0}' $stat > $stat4
 stat4b=$stat0'A2S'.txt
 head -n 1 $stat > $stat4b
-statext.pl $stat4 1 10 1 all 1 >> $stat4b
+statext.pl $stat4 1 12 1 all 1 >> $stat4b
 echo -e "Results RmsdI>2 --> $stat4b"
 
 
