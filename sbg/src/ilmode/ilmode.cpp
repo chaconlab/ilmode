@@ -50,6 +50,8 @@ typedef struct
 char file_pdb[FILE_NAME]; // Initial PDB
 char file_pdb2[FILE_NAME]; // Target PDB (final)
 char file_loops[FILE_NAME]; // Loops Multi-PDB
+char file_align[FILE_NAME];	// Movie Multi-PDB structure file name
+
 char file_movie[FILE_NAME];	// Movie Multi-PDB structure file name
 char file_final[FILE_NAME];	// Morphed PDB structure file name
 char file_log[FILE_NAME]; // Log file
@@ -957,7 +959,7 @@ int main( int argc, char * argv[] )
 		if (model==1) check_model=1;
 		if (model==2) check_model=2;
 
-		fprintf( stdout, "%s> Model  %d %d\n", prog, model, check_model );
+		// fprintf( stdout, "%s> Model  %d %d\n", prog, model, check_model );
 
 
 
@@ -1019,7 +1021,7 @@ int main( int argc, char * argv[] )
 			if (model==1) check_model=1;
 			if (model==2) check_model=2;
 
-			fprintf( stdout, "%s> Model  %d %d\n", prog, model, check_model );
+		//	fprintf( stdout, "%s> Model  %d %d\n", prog, model, check_model );
 
 
 			if(molr2->format_residues(false,check_model) > 0)
@@ -1507,26 +1509,81 @@ int main( int argc, char * argv[] )
 			fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) mobile atoms of the target loop\n", prog, ifa2, ila2);
 
 			// Get the internal indices of first and last flanking atoms of the target loop
-			if(nflanks > 0)
-			{
-				iffa2 = props2[ifr2-nflanks].k1;
-				ilfa2 = props2[ilr2+1+nflanks].k1 - 1;
-				fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) flanking atoms of the target loop\n", prog, iffa2, ilfa2);
-
-				// Computing RMSD of flanks
-				flank_rmsd = rmsd_flank(itermol, itertar, iffa, ifa, ila, ilfa, iffa2);
-				// fprintf(stderr,"Flanks RMSD: %f\n", flank_rmsd);
-				// sprintf(dummy, "%s> Flanks RMSD with %d residues= %8f\n", prog, flank_rmsd, nflanks);
-				sprintf(dummy, "%s> Flanks RMSD with %d residues= %8.2f ", prog, nflanks, flank_rmsd);
-				fprintf(f_log, "%s", dummy); // Dump log info
-				fprintf(stdout,"%s",dummy);
-			}
+//			if(nflanks > 0)
+//			{
+//				iffa2 = props2[ifr2-nflanks].k1;
+//				ilfa2 = props2[ilr2+1+nflanks].k1 - 1;
+//				fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) flanking atoms of the target loop\n", prog, iffa2, ilfa2);
+//
+//				// Computing RMSD of flanks
+//				flank_rmsd = rmsd_flank(itermol, itertar, iffa, ifa, ila, ilfa, iffa2);
+//				// fprintf(stderr,"Flanks RMSD: %f\n", flank_rmsd);
+//				// sprintf(dummy, "%s> Flanks RMSD with %d residues= %8f\n", prog, flank_rmsd, nflanks);
+//				sprintf(dummy, "%s> Flanks RMSD with %d residues= %8.2f ", prog, nflanks, flank_rmsd);
+//				fprintf(f_log, "%s", dummy); // Dump log info
+//				fprintf(stdout,"%s",dummy);
+//			}
 
 			float flank_rmsd_min = 0.0; // Flanks RMSD upon alignment, if any
 
 			// Flanks rigid body alignment using Kabsch & Sander stuff...
-			if(ali_flanks)
+
+			if(nflanks > 0)
 			{
+
+				Conditions *conds = new Conditions();
+				Condition *cond = new Condition(-1,-1,-1,-1,-1,-1,start-nflanks,start-1,-1,-1);
+				Condition *cond2 = new Condition(-1,-1,-1,-1,-1,-1,loop_end+1, loop_end+nflanks,-1,-1);
+
+				cond->add(" N  ");
+				cond->add(" CA ");
+				cond->add(" C  ");
+				cond2->add(" N  ");
+				cond2->add(" CA ");
+				cond2->add(" C  ");
+				/*if(rmsd_O) // O-atom is considered
+						{
+							cond->add(" O  ");
+							//			cond->add(" CB "); // Mon: Ideally, CB must be considered just for self-consistency in checking...
+						}
+						conds->add(cond);
+				*/
+				conds->add(cond);
+				conds->add(cond2);
+
+				Macromolecule *loopInit = mol->select(conds);
+				Macromolecule *loopTarget = mol2->select(conds);
+
+			    sprintf(dummy, "%s> Flanks RMSD with %d residues= %8.2f ", prog, nflanks, loopInit->rmsd(loopTarget));
+			    				fprintf(f_log, "%s", dummy); // Dump log info
+			    				fprintf(stdout,"%s",dummy);
+
+				//loopInit->writePDB("loopI.pdb");
+				//loopTarget->writePDB("loopT.pdb");
+
+				if(ali_flanks) {
+
+				float matrix4[4][4];
+				flank_rmsd_min = loopInit->minRmsd(loopTarget, matrix4);
+
+
+				M4Rot *matrix4_op = new M4Rot(matrix4);
+				mol2->applyAtoms(matrix4_op); // superpose
+				loopTarget->applyAtoms(matrix4_op); // superpose
+				//loopTarget->writePDB("loopTA.pdb");
+
+				delete matrix4_op;
+				sprintf(file_align,"%s_target.pdb", name);
+				loopTarget->writePDB(file_align);
+
+			    sprintf(dummy, " Flanks Min_RMSD (%d residues)= %8.2f\n", nflanks, flank_rmsd_min);
+			    fprintf(f_log, "%s", dummy); // Dump log info
+			    fprintf(stdout,"%s",dummy);
+
+
+				}
+
+				/*
 				bool *mask, *mask2; // Atomic masks for alignment
 
 				// Allocate masks memory
@@ -1542,6 +1599,7 @@ int main( int argc, char * argv[] )
 				// Activate flanks in input PDB mask
 				for(int i = iffa; i < ifa; i++)
 					mask[i] = true;
+
 				for(int i = ila+1; i <= ilfa; i++)
 					mask[i] = true;
 
@@ -1551,24 +1609,28 @@ int main( int argc, char * argv[] )
 				for(int i = ila2+1; i <= ilfa2; i++)
 					mask2[i] = true;
 
+				fprintf(stdout, "%s> ---> Flanks %d %d %d %d \n", prog, iffa, ila, iffa2, ila2);
+
+
 				// Compute transformation of target PDB and RMSD evaluation
 				float matrix4[4][4];
 				flank_rmsd_min = mol->minRmsd(mol2, matrix4, mask, mask2);
+				mol2->writePDB("prealiflanks.pdb");
 
 				// Alignment of target PDB (minRMSD) (computed with flanks selection, but applied to full model)
 				M4Rot *matrix4_op = new M4Rot(matrix4);
 				mol2->applyAtoms(matrix4_op); // superpose
 				delete matrix4_op;
 
-				// mol2->writePDB("aliflanks.pdb");
+				mol2->writePDB("aliflanks.pdb");
+
+				flank_rmsd = rmsd_flank(itermol, itertar, iffa, ifa, ila, ilfa, iffa2);
+				fprintf(stderr,"Flanks RMSD after align %f\n", flank_rmsd);
+                */
+
 			}
 
-			if(nflanks > 0)
-			{
-				sprintf(dummy, " Flanks Min_RMSD (%d residues)= %8.2f\n", nflanks, flank_rmsd_min);
-				fprintf(f_log, "%s", dummy); // Dump log info
-				fprintf(stdout,"%s",dummy);
-			}
+
 		}
 
 		// Computing Total number of degrees of freedom (hessian matrix rank)

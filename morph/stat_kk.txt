@@ -1,0 +1,4 @@
+# Morphing          RmsdI RmsdF  RmsdINCAC  RmsdFNCAC  N_res N_dh  RmsdD delta0 Motion RmsdA0 RmsdA
+# ---------------------------------------------------------------------------------------------------------
+DHV09_2q9fA1_ali_3mdmA2_kk  8.37 2.38 6.50 1.97 11 21 0.83 0.72    2.73 2.18
+DHV09_3mdmA2_ali_2q9fA1_kk  8.37 2.94 6.50 2.49 11 21 0.77 0.65    2.73 2.18

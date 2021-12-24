@@ -1,5 +1,5 @@
 
-## generate aligment with kapax
+## generate align PDBS with kapax (already done)
 ./kpax
 
 ## Align anchors +2
@@ -13,6 +13,9 @@
 
 ########
 
-awk '{print substr($1,4,2), $11, $12, substr($2,0,4) ,substr($2,5,1), substr($3,0,4), substr($3,5,1), $5,$6,$7,$10}' stat_aF2A0S.txt > DATAF2
-awk '{print substr($1,4,2), $11, $12, substr($2,0,4) ,substr($2,5,1), substr($3,0,4), substr($3,5,1), $5,$6,$7,$10}' stat_aF0A0S.txt > DATAF0
-awk '{printf "%2s %4s %6s %6s %s %s\n", substr($1,4,2),substr($1,7,4),$2,$3,$4,$5}' ../DeaneHV.txt > DEANE
+
+awk ' printf "%2s %4s %6s %6s %s %s\n", substr($1,4,2),substr($1,7,4),$2,$3,$4,$5}' ../DeaneHV.txt > DEANE
+
+
+awk '{if (substr($1,0,1) != "#") {print substr($1,4,2), substr($1,7,4), substr($1,11,1), substr($1,18,4), substr($1,22,1), $2, $3, $4, $5, $6, $9,$10 }}' stat_aF2A0S.txt > DATAF2
+awk '{if (substr($1,0,1) != "#") {print substr($1,4,2), substr($1,7,4), substr($1,11,1), substr($1,18,4), substr($1,22,1), $2, $3, $4, $5, $6 }}' stat_aF0A0S.txt > DATAF0
