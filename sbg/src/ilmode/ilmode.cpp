@@ -117,8 +117,11 @@ double maxang = 0.0; // Maximum angular increment to normalize modes [deg]
 double dc; // Characteristic distance factor for Deformability computations (see: hardy and compute_def functions in libnma_def.cpp)
 char chain = '*'; // Chain ID for initial PDB
 char chain2 = '*'; // Chain ID for target PDB
+int id_chain;
+int id_chain2;
 int check_model;
 
+FILE *f;
 
 
 
@@ -1021,7 +1024,7 @@ int main( int argc, char * argv[] )
 			if (model==1) check_model=1;
 			if (model==2) check_model=2;
 
-		//	fprintf( stdout, "%s> Model  %d %d\n", prog, model, check_model );
+			//	fprintf( stdout, "%s> Model  %d %d\n", prog, model, check_model );
 
 
 			if(molr2->format_residues(false,check_model) > 0)
@@ -1330,6 +1333,7 @@ int main( int argc, char * argv[] )
 			if(chain == ch->getName()[0])
 			{
 				fprintf( stdout, "%s> Sequence: ",prog);
+				id_chain=iter_ch->pos_chain ;
 				for( iter->pos_fragment = 0; !iter->gend_fragment(); iter->next_fragment() ) // screen residues
 				{
 					res = (Residue *) iter->get_fragment();
@@ -1401,6 +1405,8 @@ int main( int argc, char * argv[] )
 				if(chain2 == ch->getName()[0] || chain2 == '*' || npdbs > 1) // If no-chain was specified or in multi-pdb run mode, then get chain-ID from Loops
 				{
 					chain_found = true; // safety check
+					id_chain2=iter_ch->pos_chain ;
+
 					for( iter->pos_fragment = 0; !iter->gend_fragment(); iter->next_fragment() ) // screen residues
 					{
 						res = (Residue *) iter->get_fragment();
@@ -1509,20 +1515,20 @@ int main( int argc, char * argv[] )
 			fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) mobile atoms of the target loop\n", prog, ifa2, ila2);
 
 			// Get the internal indices of first and last flanking atoms of the target loop
-//			if(nflanks > 0)
-//			{
-//				iffa2 = props2[ifr2-nflanks].k1;
-//				ilfa2 = props2[ilr2+1+nflanks].k1 - 1;
-//				fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) flanking atoms of the target loop\n", prog, iffa2, ilfa2);
-//
-//				// Computing RMSD of flanks
-//				flank_rmsd = rmsd_flank(itermol, itertar, iffa, ifa, ila, ilfa, iffa2);
-//				// fprintf(stderr,"Flanks RMSD: %f\n", flank_rmsd);
-//				// sprintf(dummy, "%s> Flanks RMSD with %d residues= %8f\n", prog, flank_rmsd, nflanks);
-//				sprintf(dummy, "%s> Flanks RMSD with %d residues= %8.2f ", prog, nflanks, flank_rmsd);
-//				fprintf(f_log, "%s", dummy); // Dump log info
-//				fprintf(stdout,"%s",dummy);
-//			}
+			//			if(nflanks > 0)
+			//			{
+			//				iffa2 = props2[ifr2-nflanks].k1;
+			//				ilfa2 = props2[ilr2+1+nflanks].k1 - 1;
+			//				fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) flanking atoms of the target loop\n", prog, iffa2, ilfa2);
+			//
+			//				// Computing RMSD of flanks
+			//				flank_rmsd = rmsd_flank(itermol, itertar, iffa, ifa, ila, ilfa, iffa2);
+			//				// fprintf(stderr,"Flanks RMSD: %f\n", flank_rmsd);
+			//				// sprintf(dummy, "%s> Flanks RMSD with %d residues= %8f\n", prog, flank_rmsd, nflanks);
+			//				sprintf(dummy, "%s> Flanks RMSD with %d residues= %8.2f ", prog, nflanks, flank_rmsd);
+			//				fprintf(f_log, "%s", dummy); // Dump log info
+			//				fprintf(stdout,"%s",dummy);
+			//			}
 
 			float flank_rmsd_min = 0.0; // Flanks RMSD upon alignment, if any
 
@@ -1531,54 +1537,70 @@ int main( int argc, char * argv[] )
 			if(nflanks > 0)
 			{
 
-				Conditions *conds = new Conditions();
-				Condition *cond = new Condition(-1,-1,-1,-1,-1,-1,start-nflanks,start-1,-1,-1);
-				Condition *cond2 = new Condition(-1,-1,-1,-1,-1,-1,loop_end+1, loop_end+nflanks,-1,-1);
 
+				Conditions *conds = new Conditions();
+				Condition *cond = new Condition(-1,-1,-1,-1,id_chain,id_chain,start-nflanks,start-1,-1,-1);
+				Condition *condB = new Condition(-1,-1,-1,-1,id_chain,id_chain,loop_end+1, loop_end+nflanks,-1,-1);
 				cond->add(" N  ");
 				cond->add(" CA ");
 				cond->add(" C  ");
+				condB->add(" N  ");
+				condB->add(" CA ");
+				condB->add(" C  ");
+				//cond->add(" O  ");
+				// cond->add(" CB ");
+				conds->add(condB);
+				conds->add(cond);
+				Macromolecule *loopInit = mol->select(conds);
+				//loopInit->writePDB("loopI.pdb");
+
+
+
+				Conditions *conds2 = new Conditions();
+				Condition *cond2 = new Condition(-1,-1,-1,-1,id_chain2,id_chain2,start-nflanks,start-1,-1,-1);
+				Condition *condB2 = new Condition(-1,-1,-1,-1,id_chain2,id_chain2,loop_end+1, loop_end+nflanks,-1,-1);
 				cond2->add(" N  ");
 				cond2->add(" CA ");
 				cond2->add(" C  ");
-				/*if(rmsd_O) // O-atom is considered
-						{
-							cond->add(" O  ");
-							//			cond->add(" CB "); // Mon: Ideally, CB must be considered just for self-consistency in checking...
-						}
-						conds->add(cond);
-				*/
-				conds->add(cond);
-				conds->add(cond2);
-
-				Macromolecule *loopInit = mol->select(conds);
-				Macromolecule *loopTarget = mol2->select(conds);
-
-			    sprintf(dummy, "%s> Flanks RMSD with %d residues= %8.2f ", prog, nflanks, loopInit->rmsd(loopTarget));
-			    				fprintf(f_log, "%s", dummy); // Dump log info
-			    				fprintf(stdout,"%s",dummy);
-
-				//loopInit->writePDB("loopI.pdb");
+				condB2->add(" N  ");
+				condB2->add(" CA ");
+				condB2->add(" C  ");
+				conds2->add(condB2);
+				conds2->add(cond2);
+				Macromolecule *loopTarget = mol2->select(conds2);
 				//loopTarget->writePDB("loopT.pdb");
+
+
+
+				sprintf(dummy, "%s> Flanks RMSD with %d residues= %8.2f ", prog, nflanks, loopInit->rmsd(loopTarget));
+				fprintf(f_log, "%s", dummy); // Dump log info
+				fprintf(stdout,"%s",dummy);
+
+
 
 				if(ali_flanks) {
 
-				float matrix4[4][4];
-				flank_rmsd_min = loopInit->minRmsd(loopTarget, matrix4);
+					sprintf(file_align,"%s_align.pdb", name);
+					f= fopen(file_align,"w");
+					fclose(f);
+
+					float matrix4[4][4];
+
+					flank_rmsd_min = loopInit->minRmsd(loopTarget, matrix4);
+
+					M4Rot *matrix4_op = new M4Rot(matrix4);
+					mol2->applyAtoms(matrix4_op); // superpose
+					//loopTarget->applyAtoms(matrix4_op); // superpose
+					//loopTarget->writePDB("loopTA.pdb");
+
+					delete matrix4_op;
+                    mol2->writeMloop(file_align, 1, ifr2-nflanks, ilr2+nflanks, chain2);
 
 
-				M4Rot *matrix4_op = new M4Rot(matrix4);
-				mol2->applyAtoms(matrix4_op); // superpose
-				loopTarget->applyAtoms(matrix4_op); // superpose
-				//loopTarget->writePDB("loopTA.pdb");
 
-				delete matrix4_op;
-				sprintf(file_align,"%s_target.pdb", name);
-				loopTarget->writePDB(file_align);
-
-			    sprintf(dummy, " Flanks Min_RMSD (%d residues)= %8.2f\n", nflanks, flank_rmsd_min);
-			    fprintf(f_log, "%s", dummy); // Dump log info
-			    fprintf(stdout,"%s",dummy);
+					sprintf(dummy, " Flanks Min_RMSD (%d residues)= %8.2f\n", nflanks, flank_rmsd_min);
+					fprintf(f_log, "%s", dummy); // Dump log info
+					fprintf(stdout,"%s",dummy);
 
 
 				}
@@ -1626,7 +1648,7 @@ int main( int argc, char * argv[] )
 
 				flank_rmsd = rmsd_flank(itermol, itertar, iffa, ifa, ila, ilfa, iffa2);
 				fprintf(stderr,"Flanks RMSD after align %f\n", flank_rmsd);
-                */
+				 */
 
 			}
 
@@ -1723,8 +1745,13 @@ int main( int argc, char * argv[] )
 		sprintf(file_final,"%s_final.pdb", name); // Morphed PDB structure file name
 
 		// Delete previous trajectory file (if any)
-		FILE *f = fopen(file_movie,"w");
+
+
+		f= fopen(file_movie,"w");
 		fclose(f);
+		f= fopen(file_final,"w");
+		fclose(f);
+
 
 		int ncomps = 3*(num_atoms_loop+3); // Number of components (x,y,z for each atom of mobile loop + 3 Ct-anchor atoms)
 
@@ -1801,6 +1828,20 @@ int main( int argc, char * argv[] )
 			//			mol->writePDB("mol.pdb");
 			//			molini->writePDB("molini.pdb");
 			// exit(0);
+			float rmsd_old; // Old RMSD
+			float last_rmsd = 0; // RMSD of last saved structure
+
+
+			if(morph_switch)
+			{
+				rmsd_old = 999999; // some high value required
+				if(verb > 1)
+					fprintf(stdout,"> Initial structure dumped into Muli-PDB\n");
+				mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
+			}
+			else
+				rmsd_old = 0.0; // zero value required
+
 
 			switch (strategy)
 			{
@@ -1812,18 +1853,7 @@ int main( int argc, char * argv[] )
 			{
 				double modref; // Reference vector modulus
 				double modcurr; // Current vector modulus
-				float rmsd_old; // Old RMSD
-				float last_rmsd = 0; // RMSD of last saved structure
 
-				if(morph_switch)
-				{
-					rmsd_old = 999999; // some high value required
-					if(verb > 1)
-						fprintf(stdout,"> Initial structure dumped into Muli-PDB\n");
-					mol->writeMloop(file_movie, 1, ifr-1, ilr+1, chain);
-				}
-				else
-					rmsd_old = 0.0; // zero value required
 
 				float *coord; // (pseudo)atomic coordinates single row vector
 
@@ -2005,6 +2035,11 @@ int main( int argc, char * argv[] )
 					// Store reference mode "refmode" to maintain the requested direction
 					if(morph_switch) // Morphing
 					{
+						if(f==0) {
+							rmsd0 = rmsd_loop(itermol, itertar, ifa, num_atoms_loop, ifa2); // store initial RMSD
+						    rmsd0_ncac = rmsd_loop_residue(itermol, itertar, ifr, ifr2, nlrs );
+						}
+
 						switch(scoring) // Scoring method
 						{
 						case 1: // Atomic RMSD scoring
@@ -2016,14 +2051,17 @@ int main( int argc, char * argv[] )
 							//							show_vector(stderr, dhs2, size, "dhs2:", " %6.1f");
 							//							// Element-wise difference between dihedral angle [deg] arrays "v" and "w" (d = v - w) taking into account rotation
 							//							dihedrals_diff(dhs2, dhs, refmode, size); // Element-wise difference between vectors "v" and "w" (d = v - w)
-							//							show_vector(stderr, refmode, size, "ref: ", " %6.1f");
 							//							modref = vector_modulus( refmode, size ); // Reference vector modulus
-							//							rmsd = vector_rmsd(refmode, size);
-							//							fprintf(stderr,"dihedral_diff_module= %f  dihedral_rmsd= %f\n",modref,rmsd);
 
 							// Use the atomic coordinates "delta" vector as reference
-							delta_loop(itermol, itertar, ifa, num_atoms_loop, refmode, ifa2); // Compute "delta" vector between both conformations
-							modref = vector_modulus( refmode, ncomps ); // Reference vector modulus
+							delta_loop(itermol, itertar, ifa, num_atoms_loop +3 , refmode, ifa2); // Compute "delta" vector between both conformations
+							//show_vector(stderr, refmode, ncomps, "ref: ", " %6.1f");
+							//fprintf(stderr,"%d %d\n",num_atoms_loop,ncomps);
+
+							rmsd = vector_rmsd(refmode, size);
+                            modref = vector_modulus( refmode, ncomps ); // Reference vector modulus
+							//fprintf(stderr,"dihedral_diff_module= %f  dihedral_rmsd= %f\n",modref,rmsd);
+
 							break;
 						}
 
@@ -2285,10 +2323,7 @@ int main( int argc, char * argv[] )
 							break;
 						}
 
-						if(f==0) {
-							rmsd0 = rmsd; // store initial RMSD
-							rmsd0_ncac = rmsd_loop_residue(itermol, itertar, ifr, ifr2, nlrs );
-						}
+
 						if(verb > 0) {
 							//sprintf(dummy, " %d", clashed_loop( itermol, itermol2, ifa, num_atoms_loop, 1.0, ifa2) );
 							//strcat(text, dummy);
@@ -2375,13 +2410,13 @@ int main( int argc, char * argv[] )
 					float rmsd_ncac = rmsd_loop_residue(itermol, itertar, ifr, ifr2, nlrs );
 
 					if (verb>1) {
-					scale_vectors(tdelta, nevec, 1, 1.0);
-					// Dump "tdelta"
-					fprintf(stdout, "%s> %5s", prog, "Total"); // Dump log info
-					show_vector(stdout, tdelta, nevec, "", " %7.5f", false, true);
-					fprintf(f_log, "%s> %5s", prog, "Total"); // Dump log info
-					show_vector(f_log, tdelta, nevec, "", " %7.5f", false, true);
-                    }
+						scale_vectors(tdelta, nevec, 1, 1.0);
+						// Dump "tdelta"
+						fprintf(stdout, "%s> %5s", prog, "Total"); // Dump log info
+						show_vector(stdout, tdelta, nevec, "", " %7.5f", false, true);
+						fprintf(f_log, "%s> %5s", prog, "Total"); // Dump log info
+						show_vector(f_log, tdelta, nevec, "", " %7.5f", false, true);
+					}
 					sprintf(dummy, "%s> Morphing:  Initial_RMSD= %-8.2f NCAC %-8.2f Final_RMSD= %-8.2f NCAC %-8.2f Delta_RMSD= %-8.2f  Initial_Delta= %-8.2f  Motion= %-8.2f\n",
 							prog, rmsd0, rmsd0_ncac, rmsd, rmsd_ncac, rmsd0 - rmsd, delta0, (rmsd0 - rmsd)/ rmsd0);
 					fprintf(f_log, "%s", dummy); // Dump log info
@@ -2703,8 +2738,9 @@ int main( int argc, char * argv[] )
 
 
 				free(coordini);
-				free(cevec);
+			    free(cevec);
 				free(xnm);
+
 			}
 			break;
 
@@ -2717,6 +2753,7 @@ int main( int argc, char * argv[] )
 		if(loops_switch)
 			delete iter_loops;
 
+
 		free(coordx);
 		free(eigvect);
 		free(eigval);
@@ -2724,8 +2761,13 @@ int main( int argc, char * argv[] )
 		delete iterini;
 		delete itermol;
 		delete itermol2;
+
+		if(morph_switch)
 		delete itertar;
+
 		delete molini;
+
+
 		delete molr;
 
 		//		if(morph_switch)

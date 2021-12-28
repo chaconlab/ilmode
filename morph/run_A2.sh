@@ -4,13 +4,14 @@
 prog="ilmode"
 ntoff=0  # N-terminal offset from "start" residue in input file
 ctoff=0  # C-terminal offset from "end" residue in input file
-#suff="_aF2"  # general output suffix (bt "both terminals", nt "n-terminal", etc...)
-#opts="-m 2 --skip_missingatoms -a 1 --ns 10000 --flanks 2 --aliflanks --drmsd 0.25"
+suff="_aF2"  # general output suffix (bt "both terminals", nt "n-terminal", etc...)
+opts="-m 2 --skip_missingatoms -a 1 --ns 10000 --flanks 2 --aliflanks --drmsd 0.25"
+
 #suff="_af2"  # general output suffix (bt "both terminals", nt "n-terminal", etc...)
 #opts="-m 3 --skip_missingatoms -a 1 --ns 10000 --flanks 2 --aliflanks --drmsd 0.25"
 
-suff="_aF2x"  # general output suffix (bt "both terminals", nt "n-terminal", etc...)
-opts="-m 2 -x --skip_missingatoms -a 1 --ns 10000 --flanks 2 --aliflanks --drmsd 0.25"
+#suff="_aF2x"  # general output suffix (bt "both terminals", nt "n-terminal", etc...)
+#opts="-m 2 -x --skip_missingatoms -a 1 --ns 10000 --flanks 2 --aliflanks --drmsd 0.25"
 
 stat="stat$suff.txt"  # general output statistics file
 echo "# Morphing          RmsdI RmsdF  RmsdINCAC  RmsdFNCAC  N_res N_dh  RmsdD delta0 Motion RmsdA0 RmsdA" > $stat  # dump statistics file header

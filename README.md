@@ -23,8 +23,8 @@ Here there is another example with a different loop in where we compute all the 
 for ((i=1;i<=17;i++)); 
 do
      echo "processing mode $i";
-     ../sbg/bin/ilmode 3irs.pdb 66 76 --chain C -m 2 -i $i -a  1 -s 0  --rmsd 3.0 -drmsd 0.25 -o F >> log;
-     ../sbg/bin/ilmode 3irs.pdb 66 76 --chain C -m 2 -i $i -a -1 -s 0  --rmsd 3.0 -drmsd 0.25 -o B >> log;
+     ../sbg/bin/ilmode 3irs.pdb 66 76 --chain C -m 2 -i $i -a  1 -s 0  --rmsd 3.0 --drmsd 0.25 -o F >> log;
+     ../sbg/bin/ilmode 3irs.pdb 66 76 --chain C -m 2 -i $i -a -1 -s 0  --rmsd 3.0 --drmsd 0.25 -o B >> log;
      ../scripts/renum_tr.pl   3irsF_traj.pdb  3irsB_traj.pdb > mode_$i.pdb     
 done
  </pre>
