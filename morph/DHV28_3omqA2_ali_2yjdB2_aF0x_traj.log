@@ -1,0 +1,10 @@
+# ilmode> Welcome to ilmode v1.5
+ilmode> COMMAND: ilmode DHV28_3omqA2_ali.pdb 276 290 --chain A -t DHV28_2yjdB2_3omqA2_ali.pdb -m 2 -x --skip_missingatoms -a 1 --drmsd 0.25 -o _2yjdB2_aF0x --seed 639993461
+ilmode> Selected model residues: 229
+ilmode> Selected model (pseudo)atoms: 1810
+ilmode> Number of residues in loop: 15
+ilmode> Number of pseudo-atoms in loop: 116
+ilmode> Number of constraints: 6
+ilmode> Number of free variables in loop: 37
+ilmode> Morphing convergence reached! dRMSD = 0.000097 < 0.000100
+ilmode> Morphing:  Initial_RMSD= 2.75     NCAC 2.19     Final_RMSD= 0.88     NCAC 0.48     Delta_RMSD= 1.86      Initial_Delta= 0.79      Motion= 0.68    

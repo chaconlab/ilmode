@@ -1,0 +1,11 @@
+# ilmode> Welcome to ilmode v1.5
+ilmode> COMMAND: ilmode DHV24_2clcX4_ali.pdb 26 39 --chain X -t DHV24_2cl7X4_2clcX4_ali.pdb -m 2 --skip_missingatoms -a 1 --ns 10000 --flanks 2 --aliflanks --drmsd 0.25 -o _2cl7X4_aF2 --seed 2659170106
+ilmode> Flanks RMSD with 2 residues=     0.12  Flanks Min_RMSD (2 residues)=     0.06
+ilmode> Selected model residues: 166
+ilmode> Selected model (pseudo)atoms: 1317
+ilmode> Number of residues in loop: 14
+ilmode> Number of pseudo-atoms in loop: 112
+ilmode> Number of constraints: 6
+ilmode> Number of free variables in loop: 28
+ilmode> Morphing convergence reached! dRMSD = 0.000078 < 0.000100
+ilmode> Morphing:  Initial_RMSD= 0.78     NCAC 0.41     Final_RMSD= 0.67     NCAC 0.27     Delta_RMSD= 0.11      Initial_Delta= 0.51      Motion= 0.14    

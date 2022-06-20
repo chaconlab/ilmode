@@ -1,19 +1,27 @@
 //============================================================================
 // Name        : ilmode.cpp
 // Author      : Mon
-// Version     : 1.2
+// Version     : 1.4
 // Copyright   : Your copyright notice
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 #include <stdio.h>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <string>
+#include <random>
+#include <chrono>
+#include <limits>
+
 #include "cmdl/CmdLine.h" // Command line parser
-#include "libnma/include/libnma_misc.h" // Mon's NMA Internal Coordinates related library
+#include "libnma/include/libnma_io.h" // Mon's NMA library (Dihedral included)
 #include "libnma/include/libnma_cg.h" // Mon's NMA Coarse-Graining library
-#include "libnma/include/libnma_time.h" // Real-timer (Santi's)
 #include "libnma/include/libnma_matrix.h" // Some vector and matrix algebra routines
 #include "libpdb/include/Rotamer.h"
+#include "libnma/include/libnma_misc.h" // Mon's NMA Internal Coordinates related library
 
-char version[]="1.2"; // version code
+char version[]="1.5"; // version code
 char prog[]="ilmode"; // program name
 
 
@@ -70,6 +78,8 @@ int nevec = -1; // number of eigenvectors to be computed (set by parser)
 int imod = 0; // Index of mode to be shown (0,1,...,N-1)
 int strategy = 0; // Sampling strategy (0=raw sampling for selected mode "i", 1= hyper-square sampling, etc...
 int nsamples = 100;   // Number of samples for selected strategy
+int max_loops_save = 0;   // Number of samples for selected strategy
+
 int nsteps   = 1000;   // Number of samples for selected strategy
 float rmsd_conv = 1e-4; // RMSD convergence threshold
 float nevec_fact = -1; // % of eigenvectors to be computed (set by parser)
@@ -105,6 +115,7 @@ bool already_seed=false; // = true if seed has been defined by user
 bool skip_missingatoms = false; // Set true to skip missing atoms
 bool ali_flanks = false; // Set true to enable flanks alignment
 float cte_k0 = 1.0; // Force constant factor for Inverse Exponential
+float cte_k02 = 1.0; // Force constant factor for Inverse Exponential
 float cte_k1 = 1.0; // Force constant factor for Tirion's simple cutoff method
 float x0 = 3.8; // Inflexion point of the Inverse Exponential
 float power = 6.0; // Power term of the Iverse Exponential
@@ -157,6 +168,7 @@ void dggev_(char *jobvl, char *jobvr, int *sizex, double *hess_matrix,
 //  size  --> Number of dihedral angles (the mobile variables)
 //  model --> Coarse-Grained model
 trd *drdqC5x(float *coord, tri *props, int ifr, int ilr, int nla, int size, int model);
+inline void drdqC5x(float *coord, tri *props, int ifr, int ilr, int nla, int size, int model, trd *del);
 
 // Get array of atomic masses from a Macromolecule iterator (num_atoms is for cross-checking purposes)
 float *get_masses(pdbIter *iter, int num_atoms);
@@ -173,6 +185,32 @@ float *get_masses(pdbIter *iter, int num_atoms);
 //  size   --> Number of dihedral angles (the mobile variables)
 //  nco    --> Number of Constraints
 double *kineticC5x(trd *der, float *masses, tri *props, int ifr, int nla, int size, int nco);
+inline void kineticC5x(trd *der, float *masses, tri *props, int ifr, int nla, int size, int nco, double *mass_matrix);
+
+// Pablo's "inverse exponential function"
+inline double Inv_exp(double k, double x, double x0, double power)
+{
+	return ( k / ( 1.0 + pow( x/x0, power ) ) );
+}
+
+
+
+// Normalices eigenvectors
+inline int Norm_evec(double *evec,int nevec,int size)
+{
+	double norm = 0.0;
+	int offset;
+	// Normalizing eigenvectors
+	for(int i=0; i<nevec; i++)
+	{
+		norm = 0.0;
+		offset = i * size;
+		for(int j=0; j<size; j++) norm += pow(evec[offset+j],2); // computes the norm
+		norm = sqrt(norm);
+		for(int j=0; j<size; j++) evec[offset+j] /= norm ; // this normalizes
+	}
+	return( 0 ); // normal exit status
+}
 
 // Compute the Hessian matrix (2nd derivatives of the potential energy, H) for loops NMA
 // OUTPUT:
@@ -188,9 +226,19 @@ double *kineticC5x(trd *der, float *masses, tri *props, int ifr, int nla, int si
 //  size   --> Number of dihedral angles (the mobile variables)
 //  nco    --> Number of Constraints
 double *hessianC5x(float *coord, trd *der, tri *props, twid *decint, int nipa, int ifr, int nla, int size, int nco);
+inline void hessianC5x(float *coord, trd *der, tri *props, twid *decint, int nipa, int ifr, int nla, int size, int nco,double *rdr, double *hess_matrix );
+double *hessianFast(float *coord, float *coordCA, trd *der, tri *props, twid *decint, int nipa, int ifr, int ilr, int size, int nco, int num_atoms);
+inline void  hessianFast(float *coord, float *coordCA, trd *der, tri *props, twid *decint, int nipa,  int ifr, int ilr, int size, int nco, int num_atoms, double *hess_matrix);
 
+// Computing Tij element "on the fly"
+// (ec.21) Noguti & Go 1983 pp.3685-90
+// (T 6x6 matrix must be already allocated!)
+void calcTij( double **T, int *index, int num, twid *decint, float *coord );
 
 int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hess_matrix, int size, int nco, int *neig);
+inline int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hess_matrix, int size, int nco, int *neig, double *alphar, double *alphai, double *beta, double *vr,  double *vl,  double *work);
+
+
 
 //*  DSYGVX computes SELECTED eigenvalues, and optionally, eigenvectors
 //*  of a real generalized symmetric-definite eigenproblem, of the form
@@ -226,7 +274,8 @@ float dotprodnorm(float *v, float *w, int size, float mv = 0.0, float mw = 0.0);
 
 // Convert IC (dihedral) modes into Cartesian modes
 //	masses_sqrt --> Array of the square root of the atomic masses (one per loop atom)
-double *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, float *masses_sqrt = NULL);
+inline double *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, float *masses_sqrt = NULL);
+inline void *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, double *Aop, float *masses_sqrt = NULL);
 
 void move_loop_linear_steps(char *file, Macromolecule *mol, double *cevec, int imod, int ifpa, int nla, int steps=10, float factor=1.0);
 
@@ -234,7 +283,7 @@ void move_loop_linear(pdbIter *iter, double *cevec, int imod, int ifpa, int nla)
 void move_loop_linear_factor(pdbIter *iter, double *cevec, int imod, int ifpa, int nla, float factor);
 
 
-void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu, int size, int model, float step);
+inline void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu, int size, int model, float step);
 
 float rmsd_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla);
 
@@ -301,7 +350,9 @@ bool clashed_loop(pdbIter *iter, pdbIter *iter2, int ifpa, int nla, float cut2, 
 
 // Creates contacts list (IPA) for some loop (intra-loop + loop vs. environment) from two iterators pointing to the same Macromolecule.
 // (The "masses", i.e. occupancies, with zero mass will not be accounted for.)
-void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cutoff, twid **p_decint, int *p_nipa);
+inline void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cutoff, twid **p_decint, int *p_nipa);
+inline void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cutoff, twid *decint, int *p_nipa);
+
 
 // Get the array of atomic masses for some loop from one macromolecule iterator that points to a Macromolecule.
 //	sqrt --> Set "true" to compute the square root of the masses (to mass-weight Cartesian modes), otherwise it just gets the masses
@@ -341,9 +392,16 @@ void anchor_drift(pdbIter *iter, pdbIter *iter2, tri *props, int ilr, float *p_d
 //	chain --> (OPTIONAL) Chain-ID for output Multi-PDB
 //	update --> (OPTIONAL) if "true", the "refmode" will be updated by current most overlapping mode
 //	RETURN --> Number of non-null eigenpairs
-int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *props, float *masses, float *masses_loop, int ifa, int ifr, int ilr,
+inline int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *props, float *masses, float *masses_loop, int ifa, int ifr, int ilr,
+		int na, int size, int nco, double maxang, float cutoff, int nsamples, int max_loops_save, double *eigval, double *eigvect, float rmsd_conv = 99999, pdbIter *iterini = NULL,
+		char *file_movie = NULL, float delta_rmsd = 99999, int *p_fi = NULL, char chain = 'A', bool update=false);
+
+
+inline int MC_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *props, float *masses, float *masses_loop, int ifa, int ifr, int ilr,
 		int na, int size, int nco, double maxang, float cutoff, int nsamples, double *eigval, double *eigvect, float rmsd_conv = 99999, pdbIter *iterini = NULL,
 		char *file_movie = NULL, float delta_rmsd = 99999, int *p_fi = NULL, char chain = 'A', bool update=false);
+
+
 
 // Loop NMA routine to just compute the eigenvectors/values given some macromolecular loop
 //	mol --> Input macromolecule
@@ -371,7 +429,7 @@ void get_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord);
 // Set loop coordinates from a pre-allocated "coord" array (intended for copy & paste or coordinates backup)
 void set_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord);
 
-void update_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord);
+inline void update_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord);
 
 // Show square matrix
 void show_matrix(double *matrix, int size, char *name = "Showing matrix:", char *fmt = " %6.2f");
@@ -414,6 +472,9 @@ int main( int argc, char * argv[] )
 {
 	fprintf( stdout, "%s>\n%s> Welcome to the Internal coordinates Loops Modal analysis tool v%s\n%s>\n",prog,prog,version,prog);
 	std::string temp;
+
+	auto t1 = std::chrono::steady_clock::now();
+
 
 	// COMMAND-LINE PARSER:
 	using namespace TCLAP;
@@ -492,7 +553,7 @@ int main( int argc, char * argv[] )
 		ValueArg<float> k0_X0("", "k0_x0","Sigmoid function inflexion point (default=3.8A).",false, 3.8,"float");
 		cmd.add( k0_X0 );
 
-		ValueArg<float> k0_Cte("", "k0_k","Sigmoid function stiffness constant (default=1.0).",false, 1.0,"float");
+		ValueArg<float> k0_Cte("", "k0_k","Sigmoid function stiffness constant (default=1000.0).",false, 1000.0,"float");
 		cmd.add( k0_Cte );
 
 		ValueArg<float> k0_Cutoff("","k0_c","Sigmoid function distance cutoff (default=10A).", false, 10,"float");
@@ -551,6 +612,11 @@ int main( int argc, char * argv[] )
 		ValueArg<int> NSteps("","ns", "Max number of sampling steps (default=1000).",false,1000,"int");
 		cmd.add( NSteps );
 
+		ValueArg<int> Nloops("","nloops", "Exact number of loop saved",false,0,"int");
+	    cmd.add( Nloops );
+
+
+
 		ValueArg<int> Strategy("s","strategy","Sampling strategy direction (default=2)\n"
 				"    0= Single mode direction defined by -i\n"
 				"    1= Random contribution of all the modes\n"
@@ -579,9 +645,17 @@ int main( int argc, char * argv[] )
 
 
 
+
 		// Parse the command line.
 		// ---------------------------------------------------------------------------------------------------------------
 		cmd.parse(argc,argv);
+
+		//  Start measuring time
+		//auto start = std::chrono::high_resolution_clock::now();
+
+
+
+
 
 
 		// Load variables from parser
@@ -628,10 +702,12 @@ int main( int argc, char * argv[] )
 		// Contacting method parameters
 
 		power = k0_Power.getValue();
+		power = power/2;
 
 		cte_k0 = k0_Cte.getValue();
 
-		x0 = k0_X0.getValue();
+
+		x0 = k0_X0.getValue()*k0_X0.getValue();
 
 		cutoff_k0 = k0_Cutoff.getValue();
 
@@ -716,7 +792,7 @@ int main( int argc, char * argv[] )
 
 		nsamples = NSamples.getValue(); // Number of samples for selected strategy
 		nsteps = NSteps.getValue(); // Number of samples for selected strategy
-
+		max_loops_save = Nloops.getValue(); // Max Number of loops saved
 		target_rmsd = RMSD.getValue(); // Target RMSD for mode-following strategies
 		delta_rmsd = dRMSD.getValue(); // Delta RMSD in mode-following strategies
 
@@ -812,7 +888,6 @@ int main( int argc, char * argv[] )
 	//
 	//	sprintf(saved_files,"%s> Com file:                            %35s\n",prog,text);
 
-	timerReal timer; // Real timer (independent of parallelization)
 	Residue *res;
 	Atom *at;
 	int nipa;
@@ -986,7 +1061,7 @@ int main( int argc, char * argv[] )
 			strcpy(saved_files + saved_files_len, text);
 		}
 
-		Macromolecule *mol, *molNCAC, *molini, *molr2, *mol2, *molNCAC2;
+		Macromolecule *mol, *molNCAC, *molini, *molini2, *molr2, *mol2, *molNCAC2;
 
 		if(morph_switch) // Morphing stuff
 		{
@@ -1019,10 +1094,6 @@ int main( int argc, char * argv[] )
 			if(verb > 1)
 				fprintf( stdout, "%s> Formatting residues order and checking for missing atoms\n", prog );
 
-			if (model==0) check_model=0;
-			if (model==3) check_model=0;
-			if (model==1) check_model=1;
-			if (model==2) check_model=2;
 
 			//	fprintf( stdout, "%s> Model  %d %d\n", prog, model, check_model );
 
@@ -1045,6 +1116,8 @@ int main( int argc, char * argv[] )
 		case 0: // CA-IC model: CA + (NH and CO)-terminal
 		{
 			fprintf( stdout, "%s> Coarse-Graining model: CA-model\n", prog);
+			fprintf( stdout, "%s> Not fully implemented Exit\n", prog);
+			exit(1);
 
 			// N,CA,C selection
 			molNCAC = molr->select( ncac2 );
@@ -1059,16 +1132,7 @@ int main( int argc, char * argv[] )
 
 			// Makes model (if it's needed)
 			mol = cg_CA( molNCAC ); // masses will be computed
-
-			// Saving "NCAC" model
-			if(savemodel_switch)
-			{
-				sprintf(dummy,"%s_ncac.pdb",name);
-				molNCAC->writePDB( dummy );
-				sprintf(text,"%s> NCAC model PDB:                      %35s\n", prog, dummy);
-				saved_files_len = strlen(saved_files);
-				strcpy(saved_files + saved_files_len,text);
-			}
+			//mol = cg_CA(molNCAC,  false,  false, false, false );
 
 			if(morph_switch)
 			{
@@ -1084,12 +1148,15 @@ int main( int argc, char * argv[] )
 			fprintf( stdout, "%s> Coarse-Graining model: N,CA,C-model (ideal for KORP integration)\n", prog);
 
 			mol = molr->select( ncac2 ); // N,CA,C selection
-			mass_NCAC( mol ); // Makes model
+			// mass_NCAC( mol ); // Makes model bug pablo 2022
+			mass_NCAC( mol, false, true, false, false );
 
 			if(morph_switch)
 			{
 				mol2 = molr2->select( ncac2 ); // N,CA,C selection
-				mass_NCAC( mol2 ); // Makes model
+				// mass_NCAC( mol2 ); // Makes model bug pablo 2022
+				mass_NCAC( mol2, false, true, false, false );
+
 			}
 
 			break;
@@ -1141,19 +1208,14 @@ int main( int argc, char * argv[] )
 		molini = new Macromolecule(mol); // Initial coarse-grained macromolecule copy
 		pdbIter *iterini = new pdbIter( molini, true, true, true, true ); // Iterator to the initial (reference) macromolecule
 
+		molini2 = new Macromolecule(mol); // Initial coarse-grained macromolecule copy
+		pdbIter *iterini2 = new pdbIter( molini2, true, true, true, true ); // Iterator to the initial (reference) macromolecule
+
+
 		pdbIter *itertar; // Iterator to target macromolecule
 		if(morph_switch)
 			itertar = new pdbIter( mol2, true, true, true, true ); // Iterator to the initial (reference) macromolecule
 
-		// Saving current model
-		if(savemodel_switch)
-		{
-			sprintf(dummy,"%s_model.pdb",name);
-			mol->writePDB( dummy ); // NO-renumber the PDB
-			sprintf(text,"%s> Model PDB:                           %35s\n", prog, dummy);
-			saved_files_len = strlen(saved_files);
-			strcpy(saved_files + saved_files_len, text);
-		}
 
 
 		// Initializing some internal coords. related residue properties
@@ -1164,10 +1226,10 @@ int main( int argc, char * argv[] )
 		{
 		case 0:
 		case 3:
-			//			properCA(mol,&props,&unat);
-			//			if(morph_switch)
-			//				properCA(mol2,&props2,&unat2);
-			//			break;
+			//						properCA(mol,&props,&unat);
+			//						if(morph_switch)
+			//							properCA(mol2,&props2,&unat2);
+			//						break;
 		case 1:
 		case 2:
 			properMFA(mol,&props,&unat,type,model);
@@ -1175,6 +1237,19 @@ int main( int argc, char * argv[] )
 				properMFA(mol2,&props2,&unat2,type,model);
 			break;
 		}
+
+		// Saving current model
+		if(savemodel_switch)
+		{
+			sprintf(dummy,"%s_model.pdb",name);
+			mol->writePDB( dummy ); // NO-renumber the PDB
+			sprintf(text,"%s> Model PDB:                           %35s\n", prog, dummy);
+			fprintf(stdout,"%s> Model PDB: %s\n", prog, dummy);
+			saved_files_len = strlen(saved_files);
+			strcpy(saved_files + saved_files_len, text);
+		}
+
+
 
 		// Enable multiple loops processing
 		Macromolecule *loopsr;
@@ -1384,6 +1459,12 @@ int main( int argc, char * argv[] )
 					"Forcing exit!\n", prog, ifr, ilr, chain);
 			exit(1);
 		}
+		// Get the internal indices of first or last mobile atoms of the initial loop (required to get "just loop contacts")
+		int ifa; // internal index of the first mobile atom of the loop
+		int ila; // internal index of the last mobile atom of the loop
+		ifa = props[ifr].k1;
+		ila = props[ilr+1].k1 - 1;
+		fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) mobile atoms of the initial loop\n", prog, ifa, ila);
 
 
 		// Compute internal residue indices of target loop boundaries (NOTE: CONSIDER CHAIN-ID SOME DAY...)
@@ -1401,7 +1482,7 @@ int main( int argc, char * argv[] )
 			{
 				ch = iter_ch->get_chain();
 				pdbIter *iter = new pdbIter( ch, true, true, true, true ); // iter to screen fragments (residues)
-
+				fprintf( stdout, "%s> Sequence: ",prog);
 				if(chain2 == ch->getName()[0] || chain2 == '*' || npdbs > 1) // If no-chain was specified or in multi-pdb run mode, then get chain-ID from Loops
 				{
 					chain_found = true; // safety check
@@ -1416,6 +1497,8 @@ int main( int argc, char * argv[] )
 						{
 							num_atoms_loop2 += props[res_index].nat;
 							size2 += props[res_index].nan;
+							fprintf(stdout,"%c",AA[resnum_from_resname( res->getName() )].aa_name1);
+
 						}
 
 						// fprintf(stdout,"%d  nid= %d\n",iter->pos_fragment,res->getIdNumber());
@@ -1442,6 +1525,8 @@ int main( int argc, char * argv[] )
 
 				delete iter;
 			}
+			fprintf( stdout, "\n");
+
 			delete iter_ch;
 
 			if(!chain_found) // safety check
@@ -1461,12 +1546,6 @@ int main( int argc, char * argv[] )
 			}
 		}
 
-		// Get the internal indices of first or last mobile atoms of the initial loop (required to get "just loop contacts")
-		int ifa; // internal index of the first mobile atom of the loop
-		int ila; // internal index of the last mobile atom of the loop
-		ifa = props[ifr].k1;
-		ila = props[ilr+1].k1 - 1;
-		fprintf( stdout, "%s> Internal indices of first (%d) or last (%d) mobile atoms of the initial loop\n", prog, ifa, ila);
 
 		int iffa; // internal index of the first flanking atom of the loop
 		int ilfa; // internal index of the last flanking atom of the loop
@@ -1499,9 +1578,7 @@ int main( int argc, char * argv[] )
 
 		sprintf(saved_files,"%s> Log file:                            %35s\n",prog,file_log);
 
-		sprintf(dummy, "%s> Residues: %d  Dihedrals(DoFs): %d \n", prog, ilr-ifr+1, size);
-		fprintf(f_log, "%s", dummy); // Dump log info
-		fprintf(stdout,"%s",dummy);
+
 
 		int ifa2; // internal index of the first mobile atom of the target loop
 		int ila2; // internal index of the last mobile atom of the target loop
@@ -1594,7 +1671,7 @@ int main( int argc, char * argv[] )
 					//loopTarget->writePDB("loopTA.pdb");
 
 					delete matrix4_op;
-                    mol2->writeMloop(file_align, 1, ifr2-nflanks, ilr2+nflanks, chain2);
+					mol2->writeMloop(file_align, 1, ifr2-nflanks, ilr2+nflanks, chain2);
 
 
 
@@ -1655,25 +1732,30 @@ int main( int argc, char * argv[] )
 
 		}
 
+
 		// Computing Total number of degrees of freedom (hessian matrix rank)
 		int num_res; // Number of residues (mol)
 		int num_atoms; // Number of (pseudo)atoms (mol)
 		pdbIter *iter = new pdbIter( mol, true, true, true, true ); // iter to screen fragments (residues)
 		num_res = iter->num_fragment();
 		num_atoms = iter->num_atom();
-		fprintf( stdout, "%s> Selected model residues: %d\n", prog, num_res );
-		fprintf( stdout, "%s> Selected model (pseudo)atoms: %d\n", prog, num_atoms );
+
 
 		int reglen = loop_end - start + 1; // Number of loop residues (mobile)
 		if(props[ifr + reglen].nan != 1) // If not Proline
 			size++; // considering Ct-anchor Phi angle? (If Ct-anchor is Proline it does not have Phi)
 
+		// sprintf(dummy, "%s> Residues: %d  Dihedrals(DoFs): %d \n", prog, ilr-ifr+1, size);
 
 		int nco = 6; // Number of (scalar) constraints
-		fprintf( stdout, "%s> Number of residues in loop: %d\n", prog, reglen);
-		fprintf( stdout, "%s> Number of pseudo-atoms in loop: %d\n", prog, num_atoms_loop);
-		fprintf( stdout, "%s> Number of constraints: %d\n", prog, nco);
-		fprintf( stdout, "%s> Number of free variables in loop: %d\n", prog, size);
+		sprintf( dummy , "%s> Selected model residues: %d\n", prog, num_res );
+		sprintf( dummy + strlen(dummy), "%s> Selected model (pseudo)atoms: %d\n", prog, num_atoms );
+		sprintf( dummy + strlen(dummy), "%s> Number of residues in loop: %d\n", prog, reglen);
+		sprintf( dummy + strlen(dummy), "%s> Number of pseudo-atoms in loop: %d\n", prog, num_atoms_loop);
+		sprintf( dummy + strlen(dummy), "%s> Number of constraints: %d\n", prog, nco);
+		sprintf( dummy + strlen(dummy), "%s> Number of free variables in loop: %d\n", prog, size);
+		fprintf(f_log, "%s", dummy);
+		fprintf(stdout,"%s",dummy);
 
 		if (imod +1 >  size-nco ) {
 			fprintf(stderr, "%s> Error selected mode %d must <=  %d\n%s> Exit\n%s>\n",prog, imod+1, size-nco, prog, prog );
@@ -1730,8 +1812,6 @@ int main( int argc, char * argv[] )
 		double *mass_matrix; // Kinetic energy matrix
 		double *hess_matrix; // Hessian matrix
 
-
-
 		// Get array of atomic masses from a Macromolecule iterator
 		float *masses; // masses array
 		masses = get_masses(iter,num_atoms);
@@ -1769,6 +1849,7 @@ int main( int argc, char * argv[] )
 
 		// Delta elements array
 		double *vdelta = (double *) malloc( (size+nco) * sizeof(double)); // allocate memory for the maximum possible
+		double *vdeltaS = (double *) malloc( (size+nco) * sizeof(double)); // allocate memory for the maximum possible
 
 		// Merged mode
 		double *mode = (double *) malloc( ncomps * sizeof(double)); // current merged mode for motion
@@ -1835,12 +1916,11 @@ int main( int argc, char * argv[] )
 			if(morph_switch)
 			{
 				rmsd_old = 999999; // some high value required
-				if(verb > 1)
-					fprintf(stdout,"> Initial structure dumped into Muli-PDB\n");
-				mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
 			}
 			else
 				rmsd_old = 0.0; // zero value required
+
+
 
 
 			switch (strategy)
@@ -1853,7 +1933,10 @@ int main( int argc, char * argv[] )
 			{
 				double modref; // Reference vector modulus
 				double modcurr; // Current vector modulus
-
+				traji=0;
+				if(verb > 1)
+				fprintf(stdout,"> Initial structure dumped into Muli-PDB\n");
+				mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
 
 				float *coord; // (pseudo)atomic coordinates single row vector
 
@@ -1906,7 +1989,7 @@ int main( int argc, char * argv[] )
 						make_ipas_loop(itermol, itermol2, ifa, num_atoms_loop, cutoff_k0, &decint, &nipa);
 						// fprintf( stdout, "%s> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", prog, nipa, cutoff_k0, cte_k0, x0);
 						for(int i=0; i<nipa; i++)
-							decint[i].C = inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
+							decint[i].C = Inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
 						break;
 					}
 
@@ -1973,18 +2056,21 @@ int main( int argc, char * argv[] )
 					hess_matrix = hessianC5x(coord, der, props, decint, nipa, ifr, num_atoms_loop, size, nco);
 					//					if(scoring != 2) // "coord" required for Dihedrals RMSD
 					//						free(coord);
+					//hess_matrix = hessianFast(coord, coord, der, props, decint, nipa, ifr, ilr, size, nco, num_atoms);
 
-					if(verb > 1) {
+					if(verb > 1)
+					{
 						// Show Hessian matrix
 						show_matrix(hess_matrix, size + nco, "Hessian:", " %7.2f");
 						// Show Kinetic Energy matrix
 						show_matrix(mass_matrix, size + nco, "Kinetic:", " %7.0f");
 					}
-
 					// COMPUTING THE EIGENVECTORS AND EIGENVALUES
 					info = diag_dggev(eigval, eigvect, mass_matrix, hess_matrix, size, nco, &neig);
 					free(mass_matrix);
 					free(hess_matrix);
+
+
 
 					// MON: check this, seems unnecessary...
 					if(neig < nevec)
@@ -2027,7 +2113,14 @@ int main( int argc, char * argv[] )
 						//			cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3);
 					}
 
-					//show_vectors(stdout,cevec,ncomps,neig,"Dumping Raw CC Eigenvectors:", " %5.2e");
+					if ((f==0)&&(verb > 1))  {
+						mol->writePDB("ptraj.pdb"); // Write the morphed loop together with the complete PDB structure
+						save_ptraj_modes("ptraj.evec", (num_atoms_loop + 3)*3, 0, 10, eigval, cevec, false);
+						//show_vectors(stdout,cevec,ncomps,neig,"Dumping Raw CC Eigenvectors:", " %5.2e");
+
+						//exit(1);
+					}
+					// show_vectors(stdout,cevec,ncomps,neig,"Dumping Raw CC Eigenvectors:", " %5.2e");
 
 					// fprintf(stdout,"size= %d  nlrs= %d %d\n",size,nlrs, f);
 					//					exit(0);
@@ -2037,7 +2130,7 @@ int main( int argc, char * argv[] )
 					{
 						if(f==0) {
 							rmsd0 = rmsd_loop(itermol, itertar, ifa, num_atoms_loop, ifa2); // store initial RMSD
-						    rmsd0_ncac = rmsd_loop_residue(itermol, itertar, ifr, ifr2, nlrs );
+							rmsd0_ncac = rmsd_loop_residue(itermol, itertar, ifr, ifr2, nlrs );
 						}
 
 						switch(scoring) // Scoring method
@@ -2056,10 +2149,10 @@ int main( int argc, char * argv[] )
 							// Use the atomic coordinates "delta" vector as reference
 							delta_loop(itermol, itertar, ifa, num_atoms_loop +3 , refmode, ifa2); // Compute "delta" vector between both conformations
 							//show_vector(stderr, refmode, ncomps, "ref: ", " %6.1f");
-							//fprintf(stderr,"%d %d\n",num_atoms_loop,ncomps);
 
+							//fprintf(stderr,"%d %d\n",num_atoms_loop,ncomps);
 							rmsd = vector_rmsd(refmode, size);
-                            modref = vector_modulus( refmode, ncomps ); // Reference vector modulus
+							modref = vector_modulus( refmode, ncomps ); // Reference vector modulus
 							//fprintf(stderr,"dihedral_diff_module= %f  dihedral_rmsd= %f\n",modref,rmsd);
 
 							break;
@@ -2163,7 +2256,103 @@ int main( int argc, char * argv[] )
 								strcat(text, dummy);
 							}
 						}
-						// show_vector(stderr, vdelta, nevec, "", " %7.5f", false, false); //
+
+						if ((f==0)&&(verb > 1)) {
+							float vdump;
+							float vdump2=0;
+
+							double *cevec2  = (double *) malloc( ncomps * sizeof(double));
+
+
+							for(int i=0; i<ncomps; i++)
+								cevec2[i]=0;
+
+							//show_cartmode(coord, refmode, props, ifr, num_atoms_loop + 3, "refmode.txt", 0);
+							float sample0=100.0;
+
+							double ga=0, siga=0;
+							for(int j=0; j<sample0; j++) {
+
+								// generate random eigenvectors
+								for(int n=0; n<nevec; n++)
+									for(int i=0; i<ncomps-6; i++)
+										cevec2[i]=rg->Random()-0.5;
+
+								// calculate random gammas
+								double ga0=0;
+								for(int n=0; n<nevec; n++) {
+									ddot = dotprodnorm( refmode, cevec2, ncomps, modref );
+									ga0 += ddot*ddot;
+								}
+								// stats
+								ga += ga0;
+								siga += ga0*ga0;
+								// fprintf( stdout, "%d %7.3f\n", j, ga0);
+
+							}
+
+							ga/=sample0;
+							siga = sqrt(siga/sample0 - ga*ga );
+							fprintf(stdout, " avg %7.3f sig %7.3f %.0f\n", ga,siga,sample0);
+
+							//show_cartmode(coord, cevec2, props, ifr, num_atoms_loop + 3, "evec.txt", 0);
+
+							//getchar();
+							// for(int n=0; n<nevec; n++) {
+							// ddot = dotprodnorm( refmode, cevec + n*ncomps, ncomps, modref );
+							// / Compute vectors with delta components
+
+
+							for(int n=0; n<nevec; n++) {
+								vdump2+=1/eigval[n];
+							}
+							fprintf( f_log, "%s> Variance  ", prog );
+							for(int n=0; n<nevec; n++) {
+								fprintf( f_log, " %7.3f", 1/eigval[n]/vdump2);
+							}
+							fprintf( f_log, " \n");
+
+							fprintf( stdout, "%s> Overlap %7.3f Modes ", prog, delta );
+							fprintf( f_log, "%s> Overlap %7.3f Modes ", prog, delta );
+
+							for(int n=0; n<nevec; n++) {
+								// fprintf( stdout, "% 7.3f",vdelta[n]);
+								vdeltaS[n]=vdelta[n];
+							}
+							// fprintf( stdout, "\n");
+							//							for(int i=0; i<nevec; i++)
+							//							 for(int j=i+1; j<nevec; j++)
+							//								 if (vdeltaS[i]<vdeltaS[j]) {
+							//									 vdump=vdeltaS[i];
+							//									 vdeltaS[i]=vdeltaS[j];
+							//									 vdeltaS[j]=vdump;
+							//								 }
+							vdump=0;
+							vdump2=0;
+							float variance = 0;
+							for(int n=0; n<nevec; n++) {
+
+								//fprintf( stdout, " variance %7.3f %d",variance, n);
+
+								fprintf( stdout, " %7.3f",vdeltaS[n]);
+								fprintf( f_log, " %7.3f",vdeltaS[n]);
+								//fprintf( f_log, " %7.3f",vdeltaS[n]-vdelta2[n])/(sq_sum[n]);
+
+								vdump+=vdeltaS[n];
+								//							   if ((variance+=1/eigval[n]/vdump2) > 0.98) {
+								//								   fprintf( stdout, " var %7.3f %d ",variance-1/eigval[n]/vdump2, n);
+								//								   fprintf( f_log, " var %7.3f %d ",variance-1/eigval[n]/vdump2, n);
+								//								   break;
+								//
+								//							   }
+							}
+							fprintf( stdout, " sum %7.3f Z %7.3f\n", vdump, (vdump-ga)/(siga));
+							fprintf( f_log, " sum %7.3f Z %7.3f\n", vdump,  (vdump-ga)/(siga));
+
+
+						}
+
+						//show_vector(stderr, vdelta, nevec, "", " %7.5f", false, false); //
 						break;
 					}
 
@@ -2246,12 +2435,12 @@ int main( int argc, char * argv[] )
 						}
 						else  {
 
-							// apply lienar in steps
-							int num_steps=100000;
+							// apply linear in steps
+							int num_steps=1000;
 
 							move_loop_linear_factor(itermol, mode, 0, ifa, num_atoms_loop + 3,1.0/num_steps); // including Ct-anchor (+3) for checking purposes...
 
-							update_loop_coords(itermol, props[ifr].k1, num_atoms_loop+3, coord);
+						    update_loop_coords(itermol, props[ifr].k1, num_atoms_loop+3, coord);
 
 							if (f==0)
 								mol->writeMloop("linear_traj.pdb", 1, ifr-1, ilr+1, chain);
@@ -2275,9 +2464,9 @@ int main( int argc, char * argv[] )
 								}
 								scale_vectors(mode, 3 * (num_atoms_loop + 3), 1, fabs(maxang) * M_PI / 180.0); // Scale current merged mode
 								move_loop_linear_factor(itermol, mode, 0, ifa, num_atoms_loop +3 ,1.0/num_steps); // including Ct-anchor (+3) for checking purposes...
-								update_loop_coords(itermol, props[ifr].k1, num_atoms_loop +3 , coord);
+								//update_loop_coords(itermol, props[ifr].k1, num_atoms_loop +3 , coord);
 								if (f==0)
-									mol->writeMloop("linear_traj.pdb", s, ifr-1, ilr+1, chain);
+							 	mol->writeMloop("linear_traj.pdb", s, ifr-1, ilr+1, chain);
 
 							}
 						}
@@ -2330,9 +2519,10 @@ int main( int argc, char * argv[] )
 							sprintf(dummy, " %7.4f", rmsd);
 							strcat(text, dummy);
 							fprintf(stdout, "%s\n", text); // Dump all output for current frame
+							fprintf(f_log, "%s\n", text); // Dump log info
+
 						}
 
-						fprintf(f_log, "%s\n", text); // Dump log info
 
 						// Morphing Convergence Test
 						if(rmsd_old - rmsd < rmsd_conv)
@@ -2354,9 +2544,10 @@ int main( int argc, char * argv[] )
 							sprintf(dummy, " %7.4f", rmsd);
 							strcat(text, dummy);
 							fprintf(stdout,"%s\n", text); // Dump all output for current frame
+							fprintf(f_log, "%s\n", text); // Dump log info
+
 						}
 
-						fprintf(f_log, "%s\n", text); // Dump log info
 
 						// Convergence test
 						//				if(!mr_switch && (rmsd - rmsd_old < rmsd_conv || clashed_loop( itermol, itermol2, ifa, num_atoms_loop, 1.0)))
@@ -2365,7 +2556,7 @@ int main( int argc, char * argv[] )
 						{
 							sprintf(dummy, "%s> Motion convergence reached! dRMSD = %8f < %8f\n", prog, rmsd-rmsd_old, rmsd_conv);
 							fprintf(f_log, "%s", dummy); // Dump log info
-							fprintf(stdout,"%s",dummy);
+							if (verb > 0) fprintf(stdout,"%s",dummy);
 							break;
 						}
 
@@ -2373,7 +2564,7 @@ int main( int argc, char * argv[] )
 						{
 							sprintf(dummy, "%s> Motion convergence reached! RMSD = %8f > %8f target_rmsd\n", prog, rmsd, target_rmsd);
 							fprintf(f_log, "%s", dummy); // Dump log info
-							fprintf(stdout,"%s",dummy);
+							if (verb > 0) fprintf(stdout,"%s",dummy);
 							break;
 						}
 					}
@@ -2398,7 +2589,7 @@ int main( int argc, char * argv[] )
 				}
 
 				if(delta_rmsd != 999999)
-					fprintf( stdout, "%s> Saving %s and %s dRMSD = %8f > %8f\n", prog, file_movie, file_final, rmsd - last_rmsd, delta_rmsd);
+					fprintf( stdout, "%s> Saving %s and %s dRMSD = %8f > %8f\n", prog, file_movie, file_final, fabsf(rmsd - last_rmsd), delta_rmsd);
 				else
 					fprintf( stdout, "%s> Final structure dumped into Muli-PDBs dRMSD = %8f\n", prog, rmsd );
 
@@ -2428,222 +2619,6 @@ int main( int argc, char * argv[] )
 			}
 			break;
 
-			//
-			// CASE 1   Single-NMA Monte Carlo
-			//
-
-			case 999:
-			{
-				// Initialize Eigenvalues
-				for(int i=0; i<size+nco; i++)
-					eigval[i] = 0.0;
-
-				// Initialize Eigenvectors
-				for(int i=0; i<(size+nco)*size; i++)
-					eigvect[i] = 0.0;
-
-				float *coord; // (pseudo)atomic coordinates single row vector
-				if(verb > 1)
-					fprintf(stdout, "%s> Getting coordinates single row (pseudo-atom model)\n", prog);
-				mol->coordMatrix( &coord );
-
-				trd *der; // Derivatives
-				if(verb > 1)
-					fprintf(stdout, "%s> Computing derivatives...\n", prog);
-				der = drdqC5x(coord, props, ifr, ilr, num_atoms_loop, size, model);
-
-				if(verb > 1)
-					fprintf(stdout, "%s> Computing Kinetic Energy matrix (masses matrix)...\n", prog);
-				mass_matrix = kineticC5x(der, masses, props, ifr, num_atoms_loop, size, nco);
-
-				// Creating Elastic network
-				if( !(decint = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )  // Required for "realloc"
-				{
-					fprintf(stdout,"Sorry, \"decint\" memory allocation failed!\n");
-					exit(1);
-				}
-
-				switch(potential)
-				{
-				case 0: // INVERSE EXPONENTIAL (power of distance for contact matrix)
-				{
-					// Making Interacting Pair of (non-virtual) Atoms (ipas)
-					make_ipas_loop(itermol, itermol2, ifa, num_atoms_loop, cutoff_k0, &decint, &nipa);
-					// fprintf( stdout, "%s> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", prog, nipa, cutoff_k0, cte_k0, x0);
-					for(int i=0; i<nipa; i++)
-						decint[i].C = inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
-					break;
-				}
-
-				case 1: // DISTANCE CUTOFF METHOD
-				{
-					// Making Interacting Pair of (non-virtual) Atoms (ipas)
-					make_ipas_loop(itermol, itermol2, ifa, num_atoms_loop, cutoff_k1, &decint, &nipa);
-					// fprintf( stdout, "%s> Cutoff Distance (%d nipas) cutoff= %.1f, k= %f ", prog, nipa, cutoff_k1, cte_k1);
-					for(int i=0; i<nipa; i++)
-						decint[i].C = cte_k1; // setting Force Constants
-					break;
-				}
-				}
-
-				// Prune contacts, just considering loop contacts
-				int nipa2 = 0;
-				switch(contact)
-				{
-				case 0: // loop vs. loop
-				{
-					if( !(decint2 = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )
-					{
-						fprintf(stdout,"Sorry, \"decint2\" memory allocation failed!\n");
-						exit(1);
-					}
-
-					// Only store contacts that involve loop atoms
-					for(int i=0; i<nipa; i++)
-						if( (decint[i].k >= ifa && decint[i].k <= ila) && (decint[i].l >= ifa && decint[i].l <= ila) )
-						{
-							nipa2++; // Counts number of Interacting Pairs of Atoms
-							decint2 = ( twid * ) realloc( decint2, nipa2 * sizeof( twid ) ); // resizes contact list-structure
-							decint2[nipa2 - 1].k = decint[i].k; // k-pseudo-atom index (i-atom index)
-							decint2[nipa2 - 1].l = decint[i].l; // l-pseudo-atom index (j-atom index)
-							decint2[nipa2 - 1].d = decint[i].d; // set distance
-							decint2[nipa2 - 1].C = decint[i].C; // force constant will be set in the future
-						}
-					// fprintf( stdout, "%s> %d initial contacts pruned to just %d\n", prog, nipa, nipa2);
-
-					// Just store the requested contacts
-					free(decint);
-
-					decint = decint2;
-					nipa = nipa2;
-					break;
-				}
-
-				case 1:
-					break;
-
-				default:
-					fprintf( stdout, "%s> Please, introduce a valid Contact method to continue!!!\n\nForcing exit!\n\n", prog);
-					exit(1);
-					break;
-				}
-
-				// IPAs checking
-				if(verb > 2 ) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
-					for(int i=0; i<nipa; i++)
-						fprintf(stdout,"ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
-
-				if(verb > 1)
-					fprintf(stdout, "%s> Computing Hessian matrix (potential energy matrix)...\n", prog);
-				hess_matrix = hessianC5x(coord, der, props, decint, nipa, ifr, num_atoms_loop, size, nco);
-				free(coord);
-
-				// Show Hessian matrix
-				if(verb > 1)
-					show_matrix(hess_matrix, size + nco, "Hessian:", " %7.2f");
-
-				// Show Kinetic Energy matrix
-				if(verb > 1)
-					show_matrix(mass_matrix, size + nco, "Kinetic:", " %7.0f");
-
-				// COMPUTING THE EIGENVECTORS AND EIGENVALUES
-				info = diag_dggev(eigval, eigvect, mass_matrix, hess_matrix, size, nco, &neig);
-
-				if(neig < nevec)
-				{
-					fprintf(stderr,"Error: More eigenverctors requested (%d) than available (%d), forcing exit!\n",nevec,neig);
-					exit(1);
-				}
-
-				// Some checking...
-				if( info ) // if info != 0
-				{
-					fprintf(stdout,"\n%s> An error occured in the matrix diagonalization: %d\n", prog, info);
-					exit(1);
-				}
-
-				if(verb > 1)
-				{
-					fprintf( stdout, "%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
-					show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
-					show_vectors(stdout,eigvect,size,neig,"Dumping Raw Eigenvectors:", " %5.2e");
-				}
-
-				// Scale eigenvectors so that the maximum value of the components is "maxang"
-				if(maxang != 0.0)
-				{
-					scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
-					if(verb > 1)
-						show_vectors(stdout,eigvect,size,neig,"Dumping Scaled Eigenvectors:", " %5.2e");
-				}
-
-				// Compute the Cartesian eigenvectors from the Internal Coordinates eigenvectors
-				double *cevec; // Cartesian eigenvectors
-				cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3);
-				free(der); // Free obsolete derivatives
-
-				// Show Cartesian normal mode in VMD
-				//				 sprintf(text, "%s_mode%02d.vmd", name, imod+1);
-				//					fprintf( stdout, "%s> saving %s\n", prog, text);
-				//				  show_cartmode(coord, cevec, props, ifr, num_atoms_loop + 3, text, imod);
-
-				// sampling
-				for(int f = 0; f < nsteps; f++) // Generate N-samples (frames)
-				{
-					// Initialize current "merged" mode
-					for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
-						mode[ k ] = 0.0; // zero initialization
-
-					sprintf(text,"%s> %4d ", prog, f);
-
-					for(int n=0; n<nevec; n++)
-					{
-						double ampn; // Amplitude of n-th mode
-						ampn = 2*rg->Random() - 1.0; // rg->Random() --> Output random float number in the interval 0 <= x < 1
-						sprintf(dummy," %5.2f", ampn );
-						strcat(text, dummy);
-
-						// Multiple modes merging
-						if(linear_switch) // linear motion
-						{
-							// Generate "merged" Cartesian mode for motion
-							for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
-								mode[ k ] += cevec[ n * ncomps + k ] * ampn;
-						}
-						else // dihedral motion
-						{
-							// Generate "merged" Dihedral-coordinates mode for motion
-							for(int k = 0; k < size; k++) // Mon added the +3, watch out!
-								mode[ k ] += eigvect[ n * size + k ] * ampn;
-						}
-					}
-
-					// Generate trajectory
-					if(linear_switch) // linear motion
-					{
-						move_loop_linear(itermol, mode, 0, ifa, num_atoms_loop); // including Ct-anchor (+3) for checking purposes...
-
-						// move_loop_linear_steps(file_movie, mol, mode, 0, ifa, num_atoms_loop + 3, 1, 1.0); // including Ct-anchor (+3) for checking purposes...
-					}
-					else // dihedral motion
-					{
-						if(maxang != 0.0)
-							scale_vectors(mode, size, 1, fabs(maxang) * M_PI / 180.0); // Scale current merged mode
-
-
-						move_loop_dihedral(itermol, ifr, ilr, props, mode, size, model, 1.0);
-						mol->writeMPDB(file_movie, f+1); // Dump current conformation (frame) to a Multi-PDB file
-					}
-
-					rmsd = rmsd_loop(iterini, itermol, ifa, num_atoms_loop);
-					sprintf(dummy, " %7.4f", rmsd);
-					strcat(text, dummy);
-					fprintf(stdout,"%s\n", text); // Dump all output for current frame
-				}
-
-				free(cevec); // free obsolete Cartesian modes
-			}
-			break;
 
 			//
 			// CASE 2   Mode-following walks from initial random merged-modes.
@@ -2655,10 +2630,11 @@ int main( int argc, char * argv[] )
 
 				// Compute the eigenvectors/values for some macromolecular loop (Required to define the initial "refmode" each iteration)
 				neig = nma_loop(mol, model, type, props, masses, ifa, ifr, ilr, num_atoms_loop, size, nco, cutoff_k0, eigval, eigvect, &der);
-				fprintf(stderr,"model= %d  type= %d  ifa= %d  ifr= %d  ilr= %d  na= %d  size= %d  nco= %d  cutoff= %f  neig= %d\n", model, type, ifa, ifr, ilr, num_atoms_loop, size, nco, cutoff_k0, neig);
+				//fprintf(stderr,"model= %d  type= %d  ifa= %d  ifr= %d  ilr= %d  na= %d  size= %d  nco= %d  cutoff= %f  neig= %d\n", model, type, ifa, ifr, ilr, num_atoms_loop, size, nco, cutoff_k0, neig);
 				// exit(0);
 
-				fprintf( stdout, "%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
+				if(verb > 1)
+					fprintf( stdout, "%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
 				// show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
 				// show_vectors(stdout,eigvect,size,neig,"Dumping Raw IC Eigenvectors:", " %5.2e");
 
@@ -2693,28 +2669,95 @@ int main( int argc, char * argv[] )
 
 				// srand(1867);
 
+				int indx[neig];
+				for(int i=0; i<neig; i++) indx[i]=i;
+
+				double sdrift=0, sadrift=0;
+
 				for(int f = 0; f < nsamples; f++) // Generate N-samples (frames)
 				{
 					// Reset reference mode
+
+					if (max_loops_save!=0) {
+				    if (fi>=max_loops_save) break;
+					if ((f==nsamples-1)&& (fi<max_loops_save)) nsamples++;
+					}
+
 					for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
 						refmode[ k ] = 0.0;
 
-					for(int i=0; i<neig; i++)
-					{
-						// Generate a random direction (in NM coordinates) based on initial conformation Normal Modes
-						xnm[i] = 2*rg->Random() - 1.0; // Random double in [-1,1) interval --> rg->Random() outputs a random float number in the interval 0 <= x < 1
-						// xnm[i] = 2*((double)rand()/RAND_MAX) - 1.0; // Random double in [-1,1) interval --> rg->Random() outputs a random float number in the interval 0 <= x < 1
 
-						// Generate a Reference Mode (refmode) from the NM coordinate and the Cartesian eigenvectors
-						for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
-							refmode[ k ] += xnm[i] * cevec[i*ncomps + k ];
+					random_shuffle(&indx[0],&indx[neig]);
+
+					int ranm = rg->IRandom(1, neig);
+
+					//					fprintf( stdout, "%s> %d %d\n", prog, neig, ranm);
+					//					for(int i=0; i<ranm; i++)
+					//					fprintf( stdout, " %d", indx[i]);
+					//					getchar();
+
+					// ranm=neig;
+
+					// Generate a random direction (in NM coordinates) based on initial conformation Normal Modes
+					double sumar=0.0;
+					while (sumar<=0.01) {
+						sumar=0;
+						for(int i=0; i<ranm; i++) {
+							double randa=2*rg->Random() - 1.0;
+							//double randa=rg->Random();
+							xnm[indx[i]] = randa;
+							sumar+=fabs(randa);
+						}
 					}
+
+					//					for(int i=0; i<neig; i++)
+					//					{
+					//                        if (xnm[i]==0) {
+					//						if (rg->Random()<0.5) xnm[i]=0.05;
+					//						else  xnm[i]=-0.05;
+					//                        } else if (xnm[i]<0) xnm[i]-=0.05;
+					//                        	else  xnm[i]+=0.05;
+					//					}
+
+
+					//					double sense;
+					//					if (rg->Random()>=0.5) sense=1.0;
+					//					else sense=-1.0;
+
+					for(int i=0; i<ranm; i++)
+					{
+						// Generate a Reference Mode (refmode) from the NM coordinate and the Cartesian eigenvectors
+						for(int k = 6; k < ncomps-9; k++) // Mon added the +3, watch out!
+							refmode[ k ] += xnm[indx[i]] * cevec[indx[i]*ncomps + k ];
+
+					}
+
+					//					show_vectors(stdout,cevec,ncomps,neig,"Dumping Raw CC Eigenvectors:", " %5.2e");
+					//					getchar();
+
+					//					for(int i=0; i<neig; i++)
+					//					{
+					//						// Generate a random direction (in NM coordinates) based on initial conformation Normal Modes
+					//						xnm[i] = 2*rg->Random() - 1.0; // Random double in [-1,1) interval --> rg->Random() outputs a random float number in the interval 0 <= x < 1
+					//
+					//						//if (xnm[i]<0) xnm[i]-=0.05;
+					//						//else  xnm[i]+=0.05;
+					//
+					//						// Generate a Reference Mode (refmode) from the NM coordinate and the Cartesian eigenvectors
+					//						for(int k = 6; k < ncomps-9; k++) // Mon added the +3, watch out!
+					//							refmode[ k ] += xnm[i] * cevec[i*ncomps + k ];
+					//
+					//					}
+
+
+
+
+
 					if (verb > 0)
 						show_vector(stdout,xnm,neig,"xnm:"," %6.3f");
-					// show_vector(stdout, refmode+12, 12, "refmode0:", " %5.2f", false, true);
+					//show_vector(stdout, refmode+12, 12, "refmode0:", " %5.2f", false, true);
 
 					// // Show refmode
-					// fprintf(stderr,"refmode: ");
 					// for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
 					//	fprintf(stderr," %5.2f",refmode[k]);
 					//	fprintf(stderr,"\n");
@@ -2722,8 +2765,325 @@ int main( int argc, char * argv[] )
 					// MON: check the "1000" below... use some PARSER input???
 
 					// Mode following routine with target RMSD
-					follow_mode(refmode, mol, model, type, props, masses, masses_loop, ifa, ifr, ilr, num_atoms_loop, size, nco, maxang, cutoff_k0, nsteps,
-							eigval, eigvect, target_rmsd, iterini, file_movie, delta_rmsd, &fi, chain, false);
+
+					double target_rmsd_ef;
+					target_rmsd_ef= target_rmsd;
+					// target_rmsd_ef=rg->Random()*target_rmsd;
+					// if (target_rmsd_ef<delta_rmsd) target_rmsd_ef=delta_rmsd;
+
+					follow_mode(refmode, mol, model, type, props, masses, masses_loop, ifa, ifr, ilr, num_atoms_loop, size, nco, maxang, cutoff_k0, nsteps, max_loops_save,
+							eigval, eigvect, target_rmsd_ef, iterini, file_movie, delta_rmsd, &fi, chain, false);
+
+					// mol->writeMPDB(file_movie, f+2); // Dump current conformation (frame) to a Multi-PDB file
+
+					// Write just the indicated loop (from the index of first residue "ifr" to index of last residue "lfr") into a Multi-PDB
+					// mol->writeMloop(file_movie, f+2, ifr-1, ilr+1, chain);
+
+					anchor_drift(iterini, itermol, props, ilr, &adist, &aang);
+					sdrift += fabs(adist - adist0); // Distance increment wrt. initial distance
+					sadrift += fabs(aang - aang0); // Angle increment wrt. initial angle
+
+
+					// Set initial loop coordinates to prevent unwanted distortions
+					set_loop_coords(itermol, ifa, num_atoms_loop, coordini);
+					//get_loop_coords(itermol, ifa, num_atoms_loop, coordini);
+					//set_loop_coords(iterini, ifa, num_atoms_loop, coordini);
+
+
+				}
+
+				fprintf( stdout, "%s> Drifts  Distance %5.3f Angle %5.3f\n", prog, sdrift/nsamples, sadrift/nsamples);
+
+				if (delta_rmsd==999999)
+					fprintf( stdout, "%s> Saved %d conformation in %s\n", prog, nsamples, file_movie);
+				else
+					fprintf( stdout, "%s> Saved %d conformation in %d runs in %s every %f Δrmsd\n", prog, fi, nsamples, file_movie, delta_rmsd);
+
+
+				free(coordini);
+				free(cevec);
+				free(xnm);
+
+			}
+			break;
+			//
+			// CASE 3   MC
+			//
+
+			case 3:
+			{
+				trd *der;
+
+				traji=0;
+						if(verb > 1)
+							fprintf(stdout,"> Initial structure dumped into Muli-PDB\n");
+						mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
+
+				anchor_drift(iterini, itermol, props, ilr, &adist0, &aang0);
+				fprintf( stdout, "%s> Initial anchor distance and angle: %f A and %f deg\n", prog, adist0, aang0);
+
+
+				// Compute the eigenvectors/values for some macromolecular loop (Required to define the initial "refmode" each iteration)
+				neig = nma_loop(mol, model, type, props, masses, ifa, ifr, ilr, num_atoms_loop, size, nco, cutoff_k0, eigval, eigvect, &der);
+				//fprintf(stderr,"model= %d  type= %d  ifa= %d  ifr= %d  ilr= %d  na= %d  size= %d  nco= %d  cutoff= %f  neig= %d\n", model, type, ifa, ifr, ilr, num_atoms_loop, size, nco, cutoff_k0, neig);
+				// exit(0);
+
+				if(verb > 1)
+					fprintf( stdout, "%s> Eigensolver successfully finished!!! (neig=%d)\n", prog, neig);
+				// show_vector(stdout,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
+				// show_vectors(stdout,eigvect,size,neig,"Dumping Raw IC Eigenvectors:", " %5.2e");
+
+				// Scale eigenvectors so that the maximum value of the components is "maxang"
+				if(maxang != 0.0)
+				{
+					scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
+					if(verb > 1)
+						show_vectors(stdout,eigvect,size,neig,"Dumping Scaled Eigenvectors:", " %5.2e");
+				}
+
+				// Compute the Cartesian eigenvectors from the Internal Coordinates eigenvectors
+				double *cevec; // Cartesian eigenvectors
+				//				masses_loop = NULL;
+				cevec = ic2cart(eigvect, neig, der, size, num_atoms_loop + 3, masses_loop);
+				free(der);
+
+				//show_vectors(stdout,cevec,ncomps,neig,"Dumping Raw CC Eigenvectors:", " %5.2e");
+
+				double *xnm; // Coordinate in Normal Modal space
+				xnm = (double *) malloc( sizeof(double) * neig); // Allocate NM coordinate
+				for(int i=0; i<neig; i++)
+					xnm[i] = 0.0; // Initialize NM coordinate
+
+				// Get initial loop coordinates
+				float *coordini0 = (float *) malloc( sizeof(float) * num_atoms_loop * 3 ); // for future copy & paste loop coordinates
+				float *coordini = (float *) malloc( sizeof(float) * num_atoms_loop * 3 ); // for future copy & paste loop coordinates
+
+				get_loop_coords(iterini, ifa, num_atoms_loop, coordini0);
+				get_loop_coords(iterini, ifa, num_atoms_loop, coordini);
+
+				// Write just the indicated loop (from Nt anchor (ifr-1) to Ct anchor (ilr+1)) into a Multi-PDB
+				int fi = 0; // Frame index
+				//mol->writeMloop(file_movie, fi++, ifr-1, ilr+1, chain); // MON: use parser option...
+
+				// srand(1867);
+
+				int indx[neig];
+				for(int i=0; i<neig; i++) indx[i]=i;
+
+
+
+				// Allocating scaling factor array (normal-mode space)
+				double *scaling = (double *) malloc( sizeof(double) * size );
+				// Allocating absolute conformation (normal-mode space)
+				double *xconf = (double *) malloc( sizeof(double) * size );
+				// Allocating Energy (normal-mode space)
+				double *ener = (double *) malloc( sizeof(double) * size );
+
+				// Initialization
+
+				for(int i=0; i< size; i++)
+				{
+					xconf[i] = 0.0;
+					ener[i] = 0.0;
+				}
+
+
+
+				double  Ef=100;
+				double rfactor = 3.889087297*2; // 7.778174594
+				double Kb = 0.00198717; // Kboltz (in Angstroms)
+				double Ta = 300;
+				double KbT = Kb * Ta; // setting thermal-energy
+
+
+
+				for(int i=0; i< size; i++)
+
+				{
+					eigval[i] *= Ef; // Applying first the user-introduced Energy-factor (another scaling term)
+					scaling[i] = rfactor * sqrt( KbT/eigval[i] ); // Computing scale factor
+					// scaling[i] = rfactor * sqrt( KbT/1.0 ); // Computing scale factor
+
+				}
+
+
+
+				// Scale eigenvectors so that the maximum value of the components is "maxang"
+
+				if(maxang != 0.0)
+
+				{
+					scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
+				//	show_vectors(stdout,eigvect,size,neig,"Dumping Scaled Eigenvectors:", " %5.2e");
+				}
+
+
+
+
+
+
+
+
+				// sampling
+
+				int accepted=0;
+
+				double enertot=0;
+				if(maxang != 0.0)
+					scale_vectors(mode, size, 1, fabs(maxang) * M_PI / 180.0); // Scale current merged mode
+
+
+				get_loop_coords(itermol, ifa, num_atoms_loop, coordini);
+
+
+				for(int f = 0; f < nsamples; f++) // Generate N-samples (frames)
+
+				{
+
+					int sel_mode = rg->IRandom(0, neig-2); // [0:1) Playing dice with Mersenne!
+
+					// Choosing random mode
+					// Choosing random displacement
+					double dx = ( (double) rg->Random() ) - 0.5; // random displacement (-0.5:0.5) (in normal-mode space)
+					// Scaling displacement increment (anisotropic step)
+
+					double ds = scaling[sel_mode] * dx; // "ds" is the scaled amplitude of the motion (in normal-mode space)
+					// Energy increment due to "ds" in "mode"
+					double enertry = 0.5 * eigval[sel_mode] * pow(xconf[sel_mode] + ds,2) - ener[sel_mode];
+
+
+					//fprintf(stdout, "sel_mode %d\n", sel_mode);
+					// Metropolis et al. acceptance test
+					if( enertry < 0 || exp(-enertry/KbT) > (double) rg->Random() )
+
+					{
+
+
+						accepted++;
+						enertot += enertry; // updating total energy
+						ener[sel_mode] += enertry; // updating mode energy
+
+				        // Initialize current "merged" mode
+
+						xconf[sel_mode] += ds; // updating conformation (in normal-mode space)
+
+						for(int k = 0; k < size; k++) // Mon added the +3, watch out!
+							mode[ k ] =  eigvect[sel_mode*size + k ]*xconf[k];; // zero initialization
+
+
+						 // move_loop_dihedral(itermol, ifr, ilr, props, mode, neig, model, 1.0);
+
+						 set_loop_coords(iterini2, ifa, num_atoms_loop, coordini);
+
+						 follow_mode(mode, molini2, model, type, props, masses, masses_loop, ifa, ifr, ilr, num_atoms_loop, size, nco, maxang, cutoff_k0, nsteps, max_loops_save,
+						 												eigval, eigvect, delta_rmsd, itermol, file_movie, 10000, &fi, chain, false);
+
+
+
+
+						rmsd = rmsd_loop(iterini, iterini2, ifa, num_atoms_loop);
+						anchor_drift(iterini, iterini2, props, ilr, &adist, &aang);
+						ddrift = adist - adist0; // Distance increment wrt. initial distance
+						adrift = aang - aang0; // Angle increment wrt. initial angle
+
+
+						if (rmsd<target_rmsd  && fabs(ddrift)<0.02 && fabs(adrift)<5) {
+							fprintf(stdout, "val  %d rmsd %7.4f drift %6.3f %5.2f\n", f, rmsd, ddrift, adrift);
+							if(f % 500 == 0)
+							mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
+
+							get_loop_coords(iterini2, ifa, num_atoms_loop, coordini);
+						    set_loop_coords(itermol, ifa, num_atoms_loop, coordini);
+
+
+
+
+						} else {
+							//fprintf(stdout, "fail %d rmsd %7.4f drift %6.3f %5.2f\n", f, rmsd, ddrift, adrift);
+							set_loop_coords(itermol, ifa, num_atoms_loop, coordini);
+							//xconf[sel_mode] -= ds;
+						}
+
+
+					}
+				}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+				get_loop_coords(itermol, ifa, num_atoms_loop, coordini);
+
+
+				for(int f = 0; f < nsamples*0.0; f++) // Generate N-samples (frames)
+				{
+					// Reset reference mode
+					for(int k = 0; k < ncomps; k++) // Mon added the +3, watch out!
+						refmode[ k ] = 0.0;
+
+
+					random_shuffle(&indx[0],&indx[neig]);
+
+					int ranm = rg->IRandom(1, neig-2);
+
+
+					// Generate a random direction (in NM coordinates) based on initial conformation Normal Modes
+					double sumar=0.0;
+					while (sumar<=0.01) {
+						sumar=0;
+						for(int i=0; i<ranm; i++) {
+							double randa=2*rg->Random() - 1.0;
+							//double randa=rg->Random();
+							xnm[indx[i]] = randa;
+							sumar+=fabs(randa);
+						}
+					}
+
+					//					for(int i=0; i<neig; i++)
+					//					{
+					//                        if (xnm[i]==0) {
+					//						if (rg->Random()<0.5) xnm[i]=0.05;
+					//						else  xnm[i]=-0.05;
+					//                        } else if (xnm[i]<0) xnm[i]-=0.05;
+					//                        	else  xnm[i]+=0.05;
+					//					}
+
+
+					//					double sense;
+					//					if (rg->Random()>=0.5) sense=1.0;
+					//					else sense=-1.0;
+					for(int i=0; i<1; i++)
+					{
+						// Generate a Reference Mode (refmode) from the NM coordinate and the Cartesian eigenvectors
+						for(int k = 6; k < ncomps-9; k++) // Mon added the +3, watch out!
+							refmode[ k ] += xnm[indx[i]] * cevec[indx[i]*ncomps + k ];
+
+					}
+
+
+
+
+					double target_rmsd_ef;
+					target_rmsd_ef= 0.1;
+					// target_rmsd_ef=rg->Random()*target_rmsd;
+					// if (target_rmsd_ef<delta_rmsd) target_rmsd_ef=delta_rmsd;
+
+					set_loop_coords(iterini2, ifa, num_atoms_loop, coordini);
+
+					follow_mode(refmode, molini2, model, type, props, masses, masses_loop, ifa, ifr, ilr, num_atoms_loop, size, nco, maxang, cutoff_k0, nsteps, max_loops_save,
+												eigval, eigvect, delta_rmsd, itermol, file_movie, 10000, &fi, chain, false);
 
 					// mol->writeMPDB(file_movie, f+2); // Dump current conformation (frame) to a Multi-PDB file
 
@@ -2731,14 +3091,39 @@ int main( int argc, char * argv[] )
 					// mol->writeMloop(file_movie, f+2, ifr-1, ilr+1, chain);
 
 					// Set initial loop coordinates to prevent unwanted distortions
+					//set_loop_coords(itermol, ifa, num_atoms_loop, coordini);
+
+					anchor_drift(iterini, iterini2, props, ilr, &adist, &aang);
+					ddrift = adist - adist0; // Distance increment wrt. initial distance
+					adrift = aang - aang0; // Angle increment wrt. initial angle
+
+					rmsd = rmsd_loop(iterini, iterini2, ifa, num_atoms_loop);
+
+
+					if (fabs(ddrift)<0.01 && fabs(adrift)<5) {
+					get_loop_coords(iterini2, ifa, num_atoms_loop, coordini);
 					set_loop_coords(itermol, ifa, num_atoms_loop, coordini);
+					mol->writeMloop(file_movie, (traji++), ifr-1, ilr+1, chain);
+
+					fprintf(stdout, "val  %d rmsd %7.4f drift %6.3f %5.2f\n", f, rmsd, ddrift, adrift);
+
+					} else {
+						set_loop_coords(itermol, ifa, num_atoms_loop, coordini);
+
+					}
+
+
+
+
+
 				}
 
-				fprintf( stdout, "%s> Saving %d runs in %s every %f Δrmsd\n", prog,  nsamples, file_movie, delta_rmsd);
+					fprintf( stdout, "%s> Saved %d conformation in %s\n", prog, traji, file_movie);
+					fprintf( stdout, "%s> Saved %d conformation in %d runs in %s every %f Δrmsd\n", prog, fi, traji, file_movie, delta_rmsd);
 
 
 				free(coordini);
-			    free(cevec);
+				free(cevec);
 				free(xnm);
 
 			}
@@ -2763,7 +3148,7 @@ int main( int argc, char * argv[] )
 		delete itermol2;
 
 		if(morph_switch)
-		delete itertar;
+			delete itertar;
 
 		delete molini;
 
@@ -2782,6 +3167,17 @@ int main( int argc, char * argv[] )
 
 		fclose(f_log); // close log file
 	}
+
+
+
+
+
+	auto t2 = std::chrono::steady_clock::now();
+	std::chrono::duration<double> elapsed_seconds = t2-t1;
+
+
+	fprintf(stdout,"%s> Processed in %.3f seconds.\n%s>\n", prog, elapsed_seconds.count(), prog);
+
 
 	return 0;
 }
@@ -3133,6 +3529,232 @@ trd *drdqC5x(float *coord, tri *props, int ifr, int ilr, int nla, int size, int 
 	return der; // Return derivatives
 }
 
+inline void drdqC5x(float *coord, tri *props, int ifr, int ilr, int nla, int size, int model, trd *der)
+{
+	bool verb = false;
+	double e[3]; // rotation axis (e_lambda)
+	double y[3]; // center of rotation
+	double r[3]; // position of current atom
+	double temp; // dummy variable
+
+	int reglen = ilr - ifr + 1; // Loop length (all mobile residues)
+	int sized = nla + 3; // Size of Derivatives (number of atoms with derivatives), "+3" includes the 3 Ct-anchor atoms for constraints.
+	int ifpa = props[ifr].k1; // Index of first (mobile) pseudo-atom of loop
+	int ilpa = props[ilr+1].k1 - 1; // Index of last (mobile) pseudo-atom of loop
+
+	int CBindex = 4;
+	if(model == 1)
+		CBindex = 3;
+
+	if(verb)
+		fprintf(stdout,"drdqC5x> ifpa: %d  ilpa: %d  CBindex: %d\n",ifpa,ilpa,CBindex);
+
+	// Allocate derivatives
+	// trd *der = (trd *) malloc( sized * size * sizeof(trd) );
+	// ptr_check(der);
+
+	// Initialize derivatives (MON: consider removal)
+	for(int i=0; i < sized*size; i++)
+	{
+		der[i].x=0.0;
+		der[i].y=0.0;
+		der[i].z=0.0;
+	}
+
+	int i = 0; // Residue index for current residue
+	int j = 0; // Dihedral angle index
+	int k = 0; // Atom index for current residue
+	int kp = 0; // Atom index in loop context
+	int c = 0; // Coordinate index
+	int k1 = 0; // Index of first atom of current residue
+	int k2 = 0; // Index of last atom of current residue
+
+	for(i = ifr; i <= ifr+reglen; i++) // Screen loop residues, i.e. from 1st loop residue to Ct-anchor, inclusive.
+	{
+		// 1st and last indices of atoms of residue
+		k1 = props[i].k1;
+		k2 = k1 + props[i].nat-1;
+
+		if(verb)
+			fprintf(stdout,"drdqC5x> i=%d  nan=%d  nat=%d  k1= %d  k2= %d\n",i,props[i].nan,props[i].nat,k1,k2);
+
+		// Derivatives of PHI dihedral angles
+		// ----------------------------------
+		if(props[i].nan != 1) // NOT Proline, i.e. if it has just one mobile angle (PHI).
+		{   // q_j = phi_i
+			if(verb)
+				fprintf(stdout,"drdqC5x> residue_i= %3d  dihedral_j= %3d  --> PHI\n",i,j);
+
+			// Compute:   e = r_CA - r_N    and    y = r_N
+			for(c=0; c<3; c++)
+			{
+				// Get:  y = r_N
+				y[c] = coord[ 3 * k1 + c]; // k1+0 --> N atom
+
+				// Compute:  e = r_CA - r_N   (vector N-->CA)
+				e[c] = coord[ 3 * (k1 + 1) + c] - y[c]; // k1+1 --> CA atom
+			}
+
+			// "e" normalization --> |e| = 1.0
+			temp = sqrt( e[0]*e[0] + e[1]*e[1] + e[2]*e[2] );
+			for(c=0; c<3; c++)
+				e[c] /= temp;
+
+			// Compute derivatives for body 1 (fixed) --> dr/dq = 0.0
+			for(k = ifpa, kp = 0; k < k1 + 2; k++, kp++) // All before current residue plus the N or CA pseudo-atoms of current residue
+			{
+				der[kp*size+j].x = 0.0;
+				der[kp*size+j].y = 0.0;
+				der[kp*size+j].z = 0.0;
+
+				if(verb)
+					fprintf(stdout,"i= %3d  j= %3d  PHI  k= %3d  kp= %3d  der= %6.3f %6.3f %6.3f\n",i,j,k,kp,der[kp*size+j].x,der[kp*size+j].y,der[kp*size+j].z);
+			}
+
+			// Compute derivatives for body 2 (mobile) --> dr/dq = e x (r-y)
+			for(k = k1 + 2; k <= ilpa + 3; k++, kp++) // All atoms after the CA pseudo-atom of current residue, up to the first 3 atoms of Ct-anchor
+			{
+				for(c=0; c<3; c++)
+					r[c] = coord[ 3 * k + c ]; // current pseudo-atom position
+
+				// Derivative of the rotation of current atom ("r") around the axis "e" and center "y" of rotation: dr/dq = e x (r-y)
+				der[kp*size + j].x = e[1] * (r[2]-y[2]) - e[2] * (r[1]-y[1]);
+				der[kp*size + j].y = e[2] * (r[0]-y[0]) - e[0] * (r[2]-y[2]);
+				der[kp*size + j].z = e[0] * (r[1]-y[1]) - e[1] * (r[0]-y[0]);
+				// These derivatives do not consider Eckart conditions (they are not needed since the loop anchors are fixed in space)
+
+				if(verb)
+					fprintf(stdout,"i= %3d  j= %3d  PHI  k= %3d  kp= %3d  der= %6.3f %6.3f %6.3f\n",i,j,k,kp,der[kp*size+j].x,der[kp*size+j].y,der[kp*size+j].z);
+			}
+
+			j++; // Update current dihedral variable index
+		}
+
+		// Derivatives of CHI dihedral angles
+		// ----------------------------------
+		if(i != ifr+reglen && props[i].nan == 3) // If it has CHI and it is not the Ct anchor
+		{   // q_j = chi_i
+			if(verb)
+				fprintf(stdout,"drdqC5x> residue_i= %3d  dihedral_j= %3d  --> CHI\n",i,j);
+
+			// Compute:   e = r_CB - r_CA    and    y = r_CA
+			for(c=0; c<3; c++)
+			{
+				// Get:  y = r_CA
+				y[c] = coord[ 3 * (k1 + 1) + c]; // k1+1 --> CA atom
+
+				// Compute:  e = r_CB - r_CA   (vector CB-->C)
+				e[c] = coord[ 3 * (k1 + CBindex) + c] - y[c]; // k1+3 --> CB atom
+			}
+
+			// "e" normalization --> |e| = 1.0
+			temp = sqrt( e[0]*e[0] + e[1]*e[1] + e[2]*e[2] );
+			for(c=0; c<3; c++)
+				e[c] /= temp;
+
+			for(k = ifpa, kp = 0; k <= ilpa; k++, kp++) // All current and previous residue atoms do not move with current PSI
+			{
+				if( k >= k1 + CBindex && k <= k2 ) // Only move the Side-chain atoms
+				{
+					// Compute derivatives for body 2 (mobile) --> dr/dq = e x (r-y)
+					for(c=0; c<3; c++)
+						r[c] = coord[ 3 * k + c ]; // current pseudo-atom position
+
+					// Derivative of the rotation of current atom ("r") around the axis "e" and center "y" of rotation: dr/dq = e x (r-y)
+					der[kp*size + j].x = e[1] * (r[2]-y[2]) - e[2] * (r[1]-y[1]);
+					der[kp*size + j].y = e[2] * (r[0]-y[0]) - e[0] * (r[2]-y[2]);
+					der[kp*size + j].z = e[0] * (r[1]-y[1]) - e[1] * (r[0]-y[0]);
+					// These derivatives do not consider Eckart conditions (they are not needed since the loop anchors are fixed in space)
+
+					if(verb)
+						fprintf(stdout,"i= %3d  j= %3d  CHI  k= %3d  kp= %3d  der= %6.3f %6.3f %6.3f  Side-chain!\n",i,j,k,kp,der[kp*size+j].x,der[kp*size+j].y,der[kp*size+j].z);
+				}
+				else
+				{
+					// Compute derivatives for body 1 (fixed) --> dr/dq = 0.0
+					der[kp*size+j].x = 0.0;
+					der[kp*size+j].y = 0.0;
+					der[kp*size+j].z = 0.0;
+
+					if(verb)
+						fprintf(stdout,"i= %3d  j= %3d  CHI  k= %3d  kp= %3d  der= %6.3f %6.3f %6.3f\n",i,j,k,kp,der[kp*size+j].x,der[kp*size+j].y,der[kp*size+j].z);
+				}
+			}
+
+			j++; // Update current dihedral variable index
+		}
+
+		// Derivatives of PSI dihedral angles
+		// ----------------------------------
+		if(i != ifr + reglen) // if not Ct-anchor, i.e. if it has mobile PSI angle
+		{   // q_j = psi_i
+			if(verb)
+				fprintf(stdout,"drdqC5x> residue_i= %3d  dihedral_j= %3d  --> PSI\n",i,j);
+
+			// Compute:   e = r_C - r_CA    and    y = r_CA
+			for(c=0; c<3; c++)
+			{
+				// Get:  y = r_CA
+				y[c] = coord[ 3 * (k1 + 1) + c]; // k1+1 --> CA atom
+
+				// Compute:  e = r_C - r_CA   (vector CA-->C)
+				e[c] = coord[ 3 * (k1 + 2) + c] - y[c]; // k1+2 --> C atom
+			}
+
+			// "e" normalization --> |e| = 1.0
+			temp = sqrt( e[0]*e[0] + e[1]*e[1] + e[2]*e[2] );
+			for(c=0; c<3; c++)
+				e[c] /= temp;
+
+			// Compute derivatives for body 1 (fixed) --> dr/dq = 0.0
+			for(k = ifpa, kp = 0; k <= k2; k++, kp++) // All current and previous residue atoms do not move with current PSI
+			{
+				if(k == k1 + 3) // if current residue Oxygen atom
+				{
+					// Compute derivatives for current residue Oxygen, it belongs to body 2 (mobile) --> dr/dq = e x (r-y)
+					for(c=0; c<3; c++)
+						r[c] = coord[ 3 * k + c ]; // current pseudo-atom position
+					// Derivative of the rotation of current atom ("r") around the axis "e" and center "y" of rotation: dr/dq = e x (r-y)
+					der[kp*size + j].x = e[1] * (r[2]-y[2]) - e[2] * (r[1]-y[1]);
+					der[kp*size + j].y = e[2] * (r[0]-y[0]) - e[0] * (r[2]-y[2]);
+					der[kp*size + j].z = e[0] * (r[1]-y[1]) - e[1] * (r[0]-y[0]);
+				}
+				else
+				{   // Body 1 does not move...
+					der[kp*size+j].x = 0.0;
+					der[kp*size+j].y = 0.0;
+					der[kp*size+j].z = 0.0;
+				}
+
+				if(verb)
+					fprintf(stdout,"i= %3d  j= %3d  PSI  k= %3d  kp= %3d  der= %6.3f %6.3f %6.3f\n",i,j,k,kp,der[kp*size+j].x,der[kp*size+j].y,der[kp*size+j].z);
+			}
+
+			// Compute derivatives for body 2 (mobile) --> dr/dq = e x (r-y)
+			for(k = k2+1; k <= ilpa + 3; k++, kp++) // All atoms after current current residue, including the first 3 atoms of Ct-anchor
+			{
+				for(c=0; c<3; c++)
+					r[c] = coord[ 3 * k + c ]; // current pseudo-atom position
+
+				// Derivative of the rotation of current atom ("r") around the axis "e" and center "y" of rotation: dr/dq = e x (r-y)
+				der[kp*size + j].x = e[1] * (r[2]-y[2]) - e[2] * (r[1]-y[1]);
+				der[kp*size + j].y = e[2] * (r[0]-y[0]) - e[0] * (r[2]-y[2]);
+				der[kp*size + j].z = e[0] * (r[1]-y[1]) - e[1] * (r[0]-y[0]);
+				// These derivatives do not consider Eckart conditions (they are not needed since the loop anchors are fixed in space)
+
+				if(verb)
+					fprintf(stdout,"i= %3d  j= %3d  PSI  k= %3d  kp= %3d  der= %6.3f %6.3f %6.3f\n",i,j,k,kp,der[kp*size+j].x,der[kp*size+j].y,der[kp*size+j].z);
+			}
+
+			j++; // Update current dihedral variable index
+		}
+
+	}
+
+	if(verb)
+		fprintf(stdout,"Number of dihedral variables (Phi,Psi,Chi) %d\n", j);
+
+}
 
 // Compute the Kinetic Energy matrix (masses matrix, M) for loops NMA
 // OUTPUT:
@@ -3165,8 +3787,10 @@ double *kineticC5x(trd *der, float *masses, tri *props, int ifr, int nla, int si
 	double *mass_matrix; // kinetic energy matrix
 	mass_matrix = (double *) malloc(sizex*sizex * sizeof(double));
 	ptr_check(mass_matrix);
-	for(i=0; i < sizex*sizex; i++)
-		mass_matrix[i] = 0.0; // Mon: initialize the Bordered Mass matrix
+	//for(i=0; i < sizex*sizex; i++)
+	//	mass_matrix[i] = 0.0; // Mon: initialize the Bordered Mass matrix
+
+	memset(mass_matrix, 0, sizex*sizex*sizeof(double));
 
 	// Build mass matrix
 	for(kp=0, ks=0; kp<nla; kp++, ks+=size) // Screen just Loop atoms
@@ -3196,6 +3820,57 @@ double *kineticC5x(trd *der, float *masses, tri *props, int ifr, int nla, int si
 
 	return mass_matrix;
 }
+inline void kineticC5x(trd *der, float *masses, tri *props, int ifr, int nla, int size, int nco, double *mass_matrix)
+{
+	int i = 0; // i-th dihedral angle
+	int isi = 0; // i-th dihedral angle (for matrix increment)
+	int j = 0; // j-th dihedral angle
+	int jsi = 0; // j-th dihedral angle (for matrix increment)
+	int k = 0; // Atom index for current residue
+	int kp = 0; // Atom index in loop context
+	int ks = 0; // Atom index in loop context (for matrix increment)
+	int c = 0; // Coordinate index
+	int sizex = size + nco;
+	int dks, dls; // some indices
+	double mak; // mass of atom k
+	double mdx, mdy, mdz; // some buffers
+
+	int ifpa = props[ifr].k1; // Index of first (mobile) pseudo-atom of loop
+
+
+	//for(i=0; i < sizex*sizex; i++)
+	//	mass_matrix[i] = 0.0; // Mon: initialize the Bordered Mass matrix
+
+	memset(mass_matrix, 0, sizex*sizex*sizeof(double));
+
+	// Build mass matrix
+	for(kp=0, ks=0; kp<nla; kp++, ks+=size) // Screen just Loop atoms
+	{
+		k = kp + ifpa;
+		mak = masses[k]; // get mass for current atom
+
+		for(i=0,isi=0; i<size; i++,isi+=sizex) // Screen i-th dihedrals
+		{
+			dks=ks+i;
+			mdx = mak * der[dks].x;
+			mdy = mak * der[dks].y;
+			mdz = mak * der[dks].z;
+
+			for(j=i;j<size;j++) // Screen j-th dihedrals
+			{   // upper triangular part (including diagonal)
+				dls = ks+j;
+				mass_matrix[isi+j] += mdx * der[dls].x + mdy * der[dls].y + mdz * der[dls].z;
+			}
+		}
+	}
+
+	// Fill in lower triangular part
+	for(i=0,isi=0; i<size; i++,isi+=sizex)
+		for(j=0,jsi=0; j<i; j++,jsi+=sizex)
+			mass_matrix[isi+j] = mass_matrix[jsi+i];
+
+}
+
 
 
 // Compute the Hessian matrix (2nd derivatives of the potential energy, H) for loops NMA
@@ -3246,13 +3921,18 @@ double *hessianC5x(float *coord, trd *der, tri *props, twid *decint, int nipa, i
 	double *hess_matrix; // Bordered Hessian matrix
 	hess_matrix = (double *) malloc(sizex*sizex * sizeof(double));
 	ptr_check(hess_matrix);
-	for(i=0; i < sizex*sizex; i++)
-		hess_matrix[i] = 0.0; // Initializing the Bordered Hessian matrix
+
+	//for(i=0; i < sizex*sizex; i++)
+	//	hess_matrix[i] = 0.0; // Initializing the Bordered Hessian matrix
+
+	memset(hess_matrix, 0, sizex*sizex*sizeof(double));
 
 	// compute Hessian matrix
 	for(int index=0; index<nipa; index++)
 	{
-		prod1 = decint[index].C / pow(decint[index].d,2);
+		// prod1 = decint[index].C / pow(decint[index].d,2);
+		// prod1 = decint[index].C / pow(decint[index].d,2);
+		prod1 = decint[index].C / decint[index].d;
 
 		k=decint[index].k;
 		l=decint[index].l;
@@ -3263,7 +3943,7 @@ double *hessianC5x(float *coord, trd *der, tri *props, twid *decint, int nipa, i
 
 		// l-->k vector
 		for(c=0; c<3; c++)
-			r[0] = coord[3*k + c] - coord[3*l + c];
+			r[c] = coord[3*k + c] - coord[3*l + c];
 
 		if(k < ifpa || k > ilpa) // if "k" (pseudo)atom is outside the loop
 		{
@@ -3385,8 +4065,2334 @@ double *hessianC5x(float *coord, trd *der, tri *props, twid *decint, int nipa, i
 
 	return hess_matrix;
 }
+// This is without matrix
+inline void hessianC5x(float *coord, trd *der, tri *props, twid *decint, int nipa, int ifr, int nla, int size, int nco, double *rdr, double *hess_matrix )
+{
+	int i = 0; // i-th dihedral angle
+	int isi = 0; // i-th dihedral angle (for matrix increment)
+	int j = 0; // j-th dihedral angle
+	int jsi = 0; // j-th dihedral angle (for matrix increment)
+	int k = 0; // k-th atom index
+	int l = 0; // l-th atom index
+
+	double r[3]; // inter-atomic vector
+	double v[3]; // some vector
+	double w[3]; // some vector
+	double wcv[3]; // some vector
+	double vw[3]; // some vector
+	double prod, prod1, sum; // some buffers
+
+	int kp = 0; // k-th atom index in loop context
+	int lp = 0; // l-th atom index in loop context
+
+	int ks = 0; // k-th atom index in loop context (for matrix increment)
+	int ls = 0; // l-th atom index in loop context (for matrix increment)
+
+	int c = 0; // Coordinate index
+	int sizex = size + nco;
+	int dks, dls; // some indices
+
+	int ifpa = props[ifr].k1; // Index of first (mobile) pseudo-atom of loop
+	int ilpa = ifpa + nla - 1; // Index of last (mobile) pseudo-atom of loop
+
+	//for(i=0; i < sizex*sizex; i++)
+	//	hess_matrix[i] = 0.0; // Initializing the Bordered Hessian matrix
+
+	memset(hess_matrix, 0, sizex*sizex*sizeof(double));
+
+	// compute Hessian matrix
+	for(int index=0; index<nipa; index++)
+	{
+		// prod1 = decint[index].C / pow(decint[index].d,2);
+		// ojo Pablo remove the sqrt of d
+		prod1 = decint[index].C / decint[index].d;
+
+		k=decint[index].k;
+		l=decint[index].l;
+		kp=k-ifpa;
+		lp=l-ifpa;
+		ks=kp*size;
+		ls=lp*size;
+
+		// l-->k vector
+		for(int c=0; c<3; c++)
+			r[c] = coord[3*k + c] - coord[3*l + c];
+
+		if(k < ifpa || k > ilpa) // if "k" (pseudo)atom is outside the loop
+		{
+			// Only "l" (pseudo)atom is mobile
+			for(i=0; i<size; i++)
+			{
+				dls = ls+i;
+				rdr[i]= r[0]*(-der[dls].x) + r[1]*(-der[dls].y) + r[2]*(-der[dls].z);
+			}
+		}
+		else if(l < ifpa || l > ilpa) // if "l" (pseudo)atom is outside the loop
+		{
+			// Only "k" (pseudo)atom is mobile
+			for(i=0; i<size; i++)
+			{
+				dks = ks+i;
+				rdr[i]= r[0]*(der[dks].x) + r[1]*(der[dks].y) + r[2]*(der[dks].z);
+			}
+		}
+		else
+		{
+			// Both (pseudo)atoms "k" and "l" are mobile (both belong to the mobile loop)
+			for(i=0; i<size; i++)
+			{
+				dks = ks+i;
+				dls = ls+i;
+				rdr[i]= r[0]*(der[dks].x-der[dls].x) + r[1]*(der[dks].y-der[dls].y) + r[2]*(der[dks].z-der[dls].z);
+			}
+		}
+
+		for(i=0,isi=0; i<size; i++, isi+=sizex) // screen rows (i)
+		{
+			//if (rdr[i]!=0.0)
+			{
+				prod  = prod1 * rdr[i];
+
+				// fill upper triangular part (including diagonal)
+				for(j=i;j<size;j++) // screen cols (j)
+					hess_matrix[isi+j] += prod * rdr[j];
+			}
+		}
+	}
+	// free(rdr);
+	// ************* Add entries corresponding to constraints ******************/
+
+	// CA (pseudo)atom index of the Ct-anchor
+	k = nla + ifpa + 1;
+
+	// v = r_N - r_CA   (of Ct-anchor residue)
+	prod = 0.0;
+	for(c=0; c<3; c++)
+	{
+		v[c] = coord[3*(k-1) + c] - coord[3*k + c];
+		prod += pow(v[c], 2);
+	}
+	prod = sqrt(prod); // norm of r_CA - r_N
+
+	for(c=0; c<3; c++)
+		v[c] /= prod;
+
+	// w = r_C - r_CA   (of Ct-anchor residue)
+	prod = 0.0;
+	for(c=0; c<3; c++)
+	{
+		w[c] = coord[3*(k+1) + c] - coord[3*k + c];
+		prod += pow(w[c], 2);
+	}
+	prod = sqrt(prod); // norm of r_C - r_CA
+
+	for(c=0; c<3; c++)
+		w[c] /= prod;
+
+	// cosg = cos(v^w)
+	double cosg = v[0]*w[0] + v[1]*w[1] + v[2]*w[2];     // cos(ang(v,w))
+
+	// wcv = w - cosg*v  (difference between w and the projection of w into v; thus wcv is orthogonal to both v and vw, see next...)
+	for(c=0; c<3; c++)          // w - cosg*v
+		wcv[c] = w[c] - cosg*v[c];
+
+	// vw = v x w
+	vw[0] = v[1]*w[2] - v[2]*w[1];
+	vw[1] = v[2]*w[0] - v[0]*w[2];
+	vw[2] = v[0]*w[1] - v[1]*w[0];    /*  v x w  */
+
+	for(i=0,isi=0; i<size; i++,isi+=sizex) // Mon: Screen "size" dihedrals
+	{
+		// Mon: CA motion of Ct-anchor is constrained
+		hess_matrix[isi+size  ] = der[(nla+1)*size+i].x; // CA pseudo-atom of Ct-anchor
+		hess_matrix[isi+size+1] = der[(nla+1)*size+i].y;
+		hess_matrix[isi+size+2] = der[(nla+1)*size+i].z;
+		// Mon: The effect of all derivatives on changing the wcv vector orientation and/or length must be zero.
+		sum  = der[nla*size+i].x * wcv[0]; // N pseudo-atom of Ct-anchor
+		sum += der[nla*size+i].y * wcv[1];
+		sum += der[nla*size+i].z * wcv[2];
+		hess_matrix[isi+size+3] = sum; // Mon: der * wcv
+		// Mon: Constraint the change in the displacement of the N atom of Ct-anchor vw The effect of all derivatives on changing the vw vector orientation and/or length must be zero.
+		sum  = der[nla*size+i].x * vw[0]; // N pseudo-atom of Ct-anchor
+		sum += der[nla*size+i].y * vw[1];
+		sum += der[nla*size+i].z * vw[2];
+		hess_matrix[isi+size+4] = sum; // Mon: der * vw
+		// Mon: The effect of all derivatives on changing the vw vector orientation and/or length must be zero.
+		sum  = der[(nla+2)*size+i].x * vw[0]; // CO pseudo-atom of Ct-anchor
+		sum += der[(nla+2)*size+i].y * vw[1];
+		sum += der[(nla+2)*size+i].z * vw[2];
+		hess_matrix[isi+size+5] = sum;
+	}
+	/***************************************************************/
+
+	/* fill in lower triangular part */
+	for(i=0,isi=0; i<sizex; i++,isi+=sizex)
+		for(j=0,jsi=0; j<i; j++,jsi+=sizex)
+			hess_matrix[isi+j] = hess_matrix[jsi+i];
+
+	//	// Mon: Tip-effect....
+	for(i=0,isi=0; i<size; i++,isi+=sizex)
+		hess_matrix[isi+i] += 1e-3;
+
+	hess_matrix[sizex*0+0] += 1e3;
+	hess_matrix[sizex*1+1] += 1e3;
+	hess_matrix[sizex*(size-2)+size-2] += 1e3;
+	hess_matrix[sizex*(size-1)+size-1] += 1e3;
 
 
+}
+
+
+void hessianFast(float *coord, float *coordCA, trd *der, tri *props, twid *decint, int nipa, int ifr, int ilr, int size, int nco, int num_atoms, double *hess_matrix)
+{
+	bool debug = false;
+	double prod,prod1;
+	int l,ind2,ind3,ls,ks;
+	double *dummy;
+	int prin, fin, j2, m, buff;
+	double r_alpha[3],r_beta[3],r[3],e[3];
+	double S[6][6],R[6],C[6][6],D[6][6],U[6][6];
+	double d,temp;
+	double v[6];
+	int resn,num_res,num_seg;
+	int index_res = 0;
+
+	if(debug)
+		printf("debug> WARNING! Using: hessianFast() nipa %d ifr %d ilr %d size %d nco %d num_atoms %d\n", nipa, ifr, ilr, size, nco, num_atoms);
+
+	// Allocate Bordered Hessian
+	int sizex = size + nco;
+	//	double *hess_matrix; // Bordered Hessian matrix
+	//	if( !(hess_matrix = (double *) malloc( sizex * sizex * sizeof(double)) ) ) // Square matrix
+	//	{
+	//		printf("Msg(hessianFast): I'm sorry, Hessian-Matrix memory allocation failed!\nForcing exit!\n");
+	//		exit(1);
+	//	}
+
+	memset(hess_matrix, 0, sizex*sizex*sizeof(double));
+
+	int reglen = ilr - ifr + 1; // Loop length (all mobile residues)
+	int ifpa = props[ifr].k1; // Index of first (mobile) pseudo-atom of loop
+	//	int ilpa = ifpa + nla - 1; // Index of last (mobile) pseudo-atom of loop
+	int ilpa = props[ilr+1].k1 - 1; // Index of last (mobile) pseudo-atom of loop
+	int nla = ilpa - ifpa + 1; // Number of loop atoms (mobile) Check!
+
+	if(debug)
+		printf("Msg(hessianFast): nipa= %d  size= %d\n", nipa, size);
+
+	//	size--;
+	//	printf("Msg(hessianFast): nipa= %d  size= %d\n", nipa, size);
+
+	// ********************************************
+	// Storing ==> (ea, ea x ra) (== (eb, eb x rb) )
+	// ********************************************
+	//		double **erx;
+	//		erx = (double **) malloc( sizeof(double *) * 6); // erx[6]
+	//		for(int i=0;i<6;i++)
+	//		erx[i] = (double *) malloc( sizeof(double) * size); // erx[6][size]
+	//
+	//		int *undh; // returns the closest unit-index on the left side of the dihedral
+	//		undh = (int *) malloc( sizeof(int) * size );
+	double erx[6][size];
+	int undh[size];
+
+	int unat[num_atoms];
+
+	for(int x=0; x<num_atoms; x++)
+		unat[x] = 0; // all atoms belong to 0 unit by default (i.e. environment)
+
+	// ****************************************************************************
+	// * First, screening dihedrals to pre-compute (ea, ea x ra) and (eb, eb x rb) <-- diadic expresions
+	// ****************************************************************************
+	int k0 = 0; // first-NH + CA + last-CO model index
+
+	for(int i=0; i<ifr; i++)
+		k0 += props[i].nat;
+
+	if(debug)
+		printf("Msg(hessianFast): k0= %d\n", k0);
+
+	int num_units = 0;
+	int un_index = 0; // un_index=0 --> environment rigid unit (i.e. the initialized value), N-CA belong to environment too (they do not move at all)
+	int natom = 0;
+
+	// ---------------------------------------------------
+	// 1. BUILDING "erx" array and other auxiliary: "undh"
+	// ---------------------------------------------------
+
+	int i = 0; // Residue index for current residue
+	int j = 0; // Dihedral angle index
+	int k = 0; // Atom index for current residue
+	int kp = 0; // Atom index in loop context
+	int c = 0; // Coordinate index
+	int k1 = 0; // Index of first atom of current residue
+	int k2 = 0; // Index of last atom of current residue
+
+	//	for(i = ifr; i <= ifr+reglen; i++) // Screen loop residues, i.e. from 1st loop residue to Ct-anchor, inclusive.
+	for(i = ifr; i < ifr+reglen; i++) // Screen loop residues, i.e. from 1st loop residue to Ct-anchor (without Ct)
+	{
+		// 1st and last indices of atoms of residue
+		k1 = props[i].k1; // index of 1st atom in residue "i"
+		k2 = k1 + props[i].nat-1;
+
+		if(debug)
+			fprintf(stdout,"hessianFast> residue i=%d  nan=%d  nat=%d  k1= %d  k2= %d\n",i,props[i].nan,props[i].nat,k1,k2);
+
+		unat[k0] = un_index;  // the unit N atom belongs to
+		k0++; // update atom counter
+
+		// Vectors for PHI dihedral angles
+		// ----------------------------------
+		if(props[i].nan != 1) // NOT Proline, i.e. if it has a mobile angle PHI
+		{   // q_j = phi_i
+			if(debug)
+				fprintf(stdout,"hessianFast> residue_i= %3d  dihedral_j= %3d  --> PHI\n",i,j);
+
+			// y_lambda (NH pos 0)
+			e[0] = -coord[k1 * 3];
+			e[1] = -coord[k1 * 3 + 1];
+			e[2] = -coord[k1 * 3 + 2];
+			// CA pos 1
+			r[0] = coord[(k1+1) * 3];
+			r[1] = coord[(k1+1) * 3 + 1];
+			r[2] = coord[(k1+1) * 3 + 2];
+			// e_lambda
+			e[0] += r[0]; // NH --> CA
+			e[1] += r[1];
+			e[2] += r[2];
+
+			temp = sqrt( e[0] * e[0] + e[1] * e[1] + e[2] * e[2] ); // normalization factor
+			for ( m = 0; m < 3; m++ )
+				e[m] /= temp; // Unit vector normalization
+
+			// ea
+			erx[0][j] = e[0];
+			erx[1][j] = e[1];
+			erx[2][j] = e[2];
+			// ea x ra
+			erx[3][j] = e[1] * r[2] - e[2] * r[1];
+			erx[4][j] = e[2] * r[0] - e[0] * r[2];
+			erx[5][j] = e[0] * r[1] - e[1] * r[0];
+
+
+			undh[j] = un_index; // which unit has the "j" dihedral seen from the right (left side)
+
+			un_index++; // update if it has PHI
+
+			j++; // Update current dihedral variable index
+		}
+
+		//		if(i > ifr)  // Not-first-residue (1st residue N-CA is a single rigid unit)
+		//			un_index++;
+
+		unat[k0] = un_index;  // the unit CA atom belongs to
+		k0++; // update atom counter
+
+		// Vectors for PSI dihedral angles
+		// ----------------------------------
+
+		// if(i < ifr+reglen-1)  // Not-last-residue (last residue CA-C can be considered a rigid unit)
+		{
+			// q_j = psi_i  // all aminoacids have mobile PSI angle
+			if(debug)
+				fprintf(stdout,"hessianFast> residue_i= %3d  dihedral_j= %3d  --> PSI\n",i,j);
+
+			// get CA pos 1
+			r[0] = coord[(k1+1) * 3];
+			r[1] = coord[(k1+1) * 3 + 1];
+			r[2] = coord[(k1+1) * 3 + 2];
+			// get C pos 2 (C=O in 3BB2R) or (C in Full-Atom)
+			e[0] = coord[(k1+2) * 3];
+			e[1] = coord[(k1+2) * 3 + 1];
+			e[2] = coord[(k1+2) * 3 + 2];
+			// e_lambda ==> CA --> C (unit vector)
+			e[0] -= r[0];
+			e[1] -= r[1];
+			e[2] -= r[2];
+
+			temp = sqrt( e[0] * e[0] + e[1] * e[1] + e[2] * e[2] );
+			for ( m = 0; m < 3; m++ )
+				e[m] /= temp; // Unit vector normalization
+
+			// ea
+			erx[0][j] = e[0];
+			erx[1][j] = e[1];
+			erx[2][j] = e[2];
+			// ea x ra
+			erx[3][j] = e[1] * r[2] - e[2] * r[1];
+			erx[4][j] = e[2] * r[0] - e[0] * r[2];
+			erx[5][j] = e[0] * r[1] - e[1] * r[0];
+
+			undh[j] = un_index; // which unit has the "j" dihedral seen from the right (left side)
+
+			j++; // Update current dihedral variable index
+		}
+
+		if(i < ifr+reglen-1)  // Not-last-residue (last residue CA-C can be considered a rigid unit)
+			un_index++;
+		//		un_index++;
+
+		unat[k0] = un_index; // the unit C atom belongs to
+		k0++; // update atom counter
+
+	}
+
+	// MON: PHI at Ct anchor dihedral ????
+	undh[j] = un_index; // which unit has the "j" dihedral seen from the right (left side)
+
+
+	if(debug)
+		fprintf(stderr,"hessianFast> undh, unat, (ea, ea x ra) and (eb, eb x rb) initialized!\n");
+
+
+	if(debug)
+	{
+		fprintf(stderr,"hessianFast> (ea, ea x ra)\n");
+		for(int x=0; x<j; x++)
+		{
+			for(int y=0; y<6; y++)
+				fprintf(stderr," %f", erx[y][x]);
+			fprintf(stderr,"\n");
+		}
+
+
+		fprintf(stderr,"hessianFast> undh=");
+		for(int x=0; x<size; x++)
+			fprintf(stderr," [%d]=%d",x,undh[x]);
+
+		fprintf(stderr,"\nhessianFast> unat=");
+		for(int x=0; x<num_atoms; x++)
+		{
+			if(x % 32 == 0)
+				fprintf(stderr,"\n");
+			fprintf(stderr," %2d",unat[x]);
+		}
+		fprintf(stderr,"\n");
+	}
+
+	// ---------------------------------------------------------------------------
+	// 2. BUILDING "unipa" (array of "ipa"s indices for interacting pair of units)
+	// ---------------------------------------------------------------------------
+	// Tij related pre-computations (to get direct Tij computation)
+
+	//	num_units = un_index + 1 + 1; // Inter-unit variables (rot-trans) dont increase units number
+	num_units = un_index + 1; // total number of units --> M = size + 1
+
+	if(debug)
+		printf("Msg(hessianFast): Number of units: %ld (%d)\n",num_units,un_index);
+
+	int unipa_index;
+	int *p_int;
+	// int **unipa;
+
+	// "unipa" stores "ipa"s indices of interacting atoms belonging to the same pair of units
+	// (triangular packing storage)
+	// unipa = (int **) malloc( sizeof(int *) * num_units * ( num_units + 1) / 2 );
+
+	// "unipa" initialization
+	//	for(i=0; i < num_units * ( num_units + 1 ) / 2; i++)
+	//		unipa[i] = (int *) malloc( sizeof(int) * 500); ;
+	//
+	//	for(i=0; i < num_units * ( num_units + 1 ) / 2; i++)
+	//		unipa[i][0]=0;
+
+	int unipa[num_units * ( num_units + 1) / 2 ][500];
+
+	for(i=0; i < num_units * ( num_units + 1 ) / 2; i++)
+		unipa[i][0]=0;
+
+	if(debug)
+		printf("Msg(hessianFast): nipa=%d\n",nipa);
+
+	// Screening "ipa"s to build "unipa" and "nunipa" (this will lead further to direct Tij computation)
+	for(int index=0; index<nipa; index++) // screens contacts (k vs. l)
+	{
+
+		k = decint[index].k; // k atom index
+		l = decint[index].l; // l atom index
+		i = unat[k]; // unit index of "k" atom
+		j = unat[l]; // unit index of "l" atom
+
+		if(debug)
+			printf("Msg(hessianFast): unipa[%d] --> k= %d  l= %d  i= %d  j= %d\n",index,k,l,i,j);
+
+		if(i != j) 	// the same unit is rigid, inner contacts must not be taken into account!
+		{		// (as well as the non contacting pairs!)
+			// The following must be always true:  (k < l) && (i < j)
+			if( i > j )
+			{
+				buff = j;
+				j = i;
+				i = buff;
+			}
+
+			// translates from "squared" to "triangular" matrix elements
+			unipa_index = i + j*(j+1)/2;
+
+
+
+			//			// Allocating memory for the new element (memory efficient)
+			//			if(unipa[unipa_index] == NULL) // If not allocated yet... then it does it!
+			//			{
+			//				if( !(p_int = (int *) realloc( unipa[unipa_index], 2 * sizeof(int) ) ) )
+			//				{
+			//					printf("Msg(hessianFast): Memory allocation failed in realloc()!\nForcing exit!\n");
+			//					exit(1);
+			//				}
+			//				unipa[unipa_index] = p_int;
+			//				unipa[unipa_index][0] = 2;
+			//			}
+			//			else // If already allocated, then increases its size one int.
+			//			{
+			//				unipa[unipa_index][0]++; // Counts number of Interacting Pairs of Atoms between (i,j) units
+			//				if( !(p_int = (int *) realloc( unipa[unipa_index], unipa[unipa_index][0] * sizeof(int) ) ) )
+			//				{
+			//					printf("Msg(hessianFast): Memory allocation failed in realloc()!\nForcing exit!\n");
+			//					exit(1);
+			//				}
+			//				unipa[unipa_index] = p_int;
+			//			}
+
+			if (unipa[unipa_index][0] == 0)
+				unipa[unipa_index][0] = 1;
+
+			unipa[unipa_index][0]++;
+
+			// Storing ipa index for k,l interacting pair of atoms
+			unipa[unipa_index][ unipa[unipa_index][0] - 1 ] = index;
+		}
+	}
+
+	if(debug)
+	{
+		fprintf(stderr, "Msg(hessianFast): UNIPA computed!\n");
+	}
+
+	// -----------------------------------------------------------------------------------
+	// 3. HESSIAN BUILDING from Uab elements:
+	// Fastest Hessian Matrix building up... (n^2...) + Some additional optimizations...
+	// Uab - Matrix Computation - (ec.23) Noguti & Go 1983 pp.3685-90
+	// -----------------------------------------------------------------------------------
+
+	// Hessian initialization
+	for(i=0; i < sizex * sizex; i++)
+		hess_matrix[i] = 0.0;
+
+	// Uabmn minimal-memory allocation (full-square + 6 cols. + Tij "on the fly" computation)
+	int uij_index = 0;
+	int uij1, uij2, uij3;
+
+	// MON: check "+1"
+	// +1 due to void element (when there are just Traslational/Rotational DoFs)
+	double ***Uij;
+	if( Uij = (double ***) malloc( sizeof(double **) * (num_units*(num_units+1)/2) ) ) // Uab[size]
+	{
+		for(i=0; i<(num_units*(num_units+1)/2); i++)
+			Uij[i] = NULL; // initialization
+	}
+	else
+	{
+		printf("Msg(hessianFast): Unable to allocate Uij-matrix!\n");
+		exit(1);
+	}
+
+	if(debug)
+		fprintf(stderr,"Uij size = %d\n", num_units*(num_units+1)/2);
+
+	// T memory allocation (6x6 matrix)
+	//double **T;
+	//	T = (double **) malloc( sizeof(double *) * 6 );
+	//	for(int i=0; i<6; i++)
+	//	T[i] = (double *) malloc( sizeof(double) * 6 );
+	double T[6][6];
+
+	if(debug)
+		fprintf(stderr,"Uab Computation Main-Loop (Computing Tij elements on-the-fly)\n");
+
+	// Uab Computation Main-Loop (Computing Tij elements "on the fly")
+	// (Which "unipa" belongs to the "outher" units corresponding to "a" and "b" dihedrals)
+	for(int b= size-3, c= size+5; b >= 0; b--,c--) 	// b --> dihedrals (column)
+	{							// c --> deleteable col. index
+		for(int a=0; a <= b; a++)	 		// a --> dihedrals (row)
+		{ 						// it fills upper triangular part (including diagonal)
+			// Units "outside" (a,b) pair are: (undh[a],undh[b]+1)
+			uij_index = undh[a] + ( undh[b] + 1 ) * ( undh[b] + 2 ) / 2;
+			// uij_index = undh[a] + undh[b] * ( undh[b] + 1 ) / 2;
+
+			if(debug)
+				fprintf(stderr,"a= %d  b= %d  undh[a]= %d  undh[b]+1= %d  uij_index= %d\n", a, b, undh[a], undh[b]+1, uij_index);
+
+			//			fprintf(stderr,"%ld ",uij_index);
+
+			// Given there are two dihedrals per CA (aprox.), up to 4 Uab(ICs) contiguous positions
+			// are equal. In "Uij"(units) the same 4 ICs combination share the same Uij, thus
+			// the Uij for the 4 ICs combination should be computed only once!
+			if( Uij[uij_index] == NULL ) // If "Uij" is not computed yet (compute Uij only once!)
+			{
+				// "in situ" Uij memory allocation
+				if( Uij[uij_index] = (double **) malloc( sizeof(double *) * 6 ) )
+				{
+					for(int m=0; m<6; m++)
+					{
+						if( Uij[uij_index][m] = (double *) malloc( sizeof(double) * 6 ) )
+						{
+							for(int n=0; n<6; n++)
+								Uij[uij_index][m][n] = 0.0;
+						}
+						else
+						{ printf("Msg(hessianM): Unable to allocate an Uab-matrix element!\n"); exit(1); }
+					}
+				}
+				else
+				{ printf("Msg(hessianM): Unable to allocate an Uab-matrix element!\n"); exit(1); }
+
+				// Uab - Matrix Computation - (ec.23) Noguti & Go 1983 pp.3685-90
+				// Computing valid indices
+
+				// U(a,b+1)
+				if(undh[b]+1 < num_units-1 ) // if valid "uab1"
+					uij1 = undh[a] + (undh[b]+2)*(undh[b]+3)/2; // i= undh[a]  j= (undh[b]+1)+1
+
+				// U(a-1,b)
+				if( undh[a] > 0 )
+					uij2 = undh[a]-1 + (undh[b]+1)*(undh[b]+2) / 2; // Uab[ dhup[a-1] ][ dhright[b] ]
+
+				// U(a-1,b+1)
+				if( undh[a] > 0 && undh[b]+2 < num_units )
+					uij3 = undh[a]-1 + (undh[b]+2)*(undh[b]+3) / 2; // Uab[ dhup[a-1] ][ dhright[b+1] ]
+
+				if(debug)
+					fprintf(stderr,"\tUij: a=%d b=%d uij1(row=%d col=%d) uij2(row=%d col=%d) uij3(row=%d col=%d) \n",a,b,undh[a],undh[b]+2,undh[a]-1,undh[b]+1,undh[a]-1,undh[b]+2);
+
+				// Computing Uij element
+				if( unipa[uij_index] != NULL ) // if "a" and "b" 's units interact
+				{				// (whether they have ipas...) --> then, "T" must be computed
+					// Computing Tij element "on the fly"
+					// (ec.21) Noguti & Go 1983 pp.3685-90
+					//	calcTij( T, unipa[uij_index], unipa[uij_index][0], decint, coordCA );
+
+
+					double r_alpha[3];
+					double r_beta[3];
+					double v[6];
+
+					for(int i=0; i<6; i++)
+						for(int j=0; j<6; j++)
+							T[i][j] = 0.0; // T initialization
+
+					for(int i=1; i < unipa[uij_index][0]; i++) // screens inter-unit contacts (k vs. l)
+					{
+						int in=unipa[uij_index][i];
+						int ki = 3*decint[in].k;
+						int li = 3*decint[in].l;
+
+						// k-atom position retrieval (alpha)
+						r_alpha[0] = coordCA[ki];
+						r_alpha[1] = coordCA[ki + 1];
+						r_alpha[2] = coordCA[ki + 2];
+
+						// l-atom position retrieval (beta)
+						r_beta[0] = coordCA[li];
+						r_beta[1] = coordCA[li + 1];
+						r_beta[2] = coordCA[li + 2];
+
+						// D-Matrix
+						v[0] = r_alpha[1] * r_beta[2] - r_alpha[2] * r_beta[1];
+						v[1] = r_alpha[2] * r_beta[0] - r_alpha[0] * r_beta[2];
+						v[2] = r_alpha[0] * r_beta[1] - r_alpha[1] * r_beta[0];
+						v[3] = r_alpha[0] - r_beta[0];
+						v[4] = r_alpha[1] - r_beta[1];
+						v[5] = r_alpha[2] - r_beta[2];
+						//double d1 = decint[in].C / pow(decint[in].d,2);
+						double d1 = decint[in].C / decint[in].d;
+
+						//fprintf(stderr,"%f %f %f %d %d\n", d1, decint[in].C , decint[in].d, ki, li);
+						//getchar();
+
+						for(int n=0;n<6;n++) // Diadic product
+							for(int m=0;m<6;m++)
+								T[n][m] += d1 * v[n] * v[m]; // Storing S-matrix
+					}
+
+
+
+
+					if(debug)
+						fprintf(stderr,"\tTij computed\n");
+
+					// (ec.23) Noguti & Go 1983 pp.3685-90
+					if( undh[a] > 0 && undh[b]+1 < num_units-1 ) // In the middle... (most of them)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m]
+																	+ Uij[uij2][n][m]
+																				   - Uij[uij3][n][m]
+																								  + T[n][m];
+					}
+					else if( undh[a] == 0 && undh[b]+1 < num_units-1 ) // In the top row (execepting: 0,n  already computed above)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m]
+																	+ T[n][m];
+					}
+					else if( undh[a] > 0 && undh[b]+1 == num_units-1 ) // In the right column (execepting: 0,n)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij2][n][m]
+																	+ T[n][m];
+					}
+					else // a == 0 && b == size-1  (0,n)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = T[n][m];
+					}
+				}
+				else // if "a" and "b" 's units don't interact
+				{	 // (no ipas...) --> then, "T" computation is not necessary!
+					// fprintf(stderr,"\tTij not-computed\n");
+
+					if( undh[a] > 0 && undh[b]+1 < num_units-1 ) // In the middle... (most of them)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m]
+																	+ Uij[uij2][n][m]
+																				   - Uij[uij3][n][m];
+					}
+					else if( undh[a] == 0 && undh[b]+1 < num_units-1 ) // In the top row (execepting: 0,n  already computed above)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m];
+					}
+					else if( undh[a] > 0 && undh[b]+1 == num_units-1 ) // In the right column (execepting: 0,n)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij2][n][m];
+					}
+					// if no interaction, then no Tij addition to Uab needed!
+				}
+
+				// at this point, the Uij element is fully computed!
+
+				// Show Uij[]
+				if(debug)
+				{
+					fprintf(stderr,"Uij[%d] a=%d b=%d\n", uij_index, a, b);
+					for(int n=0;n<6;n++)
+						for(int m=0;m<6;m++)
+							fprintf(stderr," %f", Uij[uij_index][n][m]);
+					fprintf(stderr,"\n");
+				}
+
+			}   	// only if not computed yet!
+
+			// ****************************************************
+			// Rab - Matrix Computation
+			// Noguti & Go (1983) pp. 3685-90
+			// ****************************************************
+			// Rab Computation ( the same Single- or Multi- Chain)
+			// Table I. Noguti & Go 1983 pp.3685-90
+			// backbone vs. backbone --> Rab = Uab
+
+			// (ec.16) Noguti & Go 1983 pp.3685-90
+			// fprintf(stderr,"\tRij= ");
+			for(int n=0; n<6; n++)
+			{
+				R[n] = 0.0;
+				for(int m=0; m<6; m++)
+					R[n] += erx[m][a] * Uij[uij_index][m][n]; // era x Rab
+				// fprintf(stderr,"%f ",R[n]);
+			}
+			// fprintf(stderr,"\n");
+
+			temp = 0.0;
+			for(int n=0; n<6; n++)
+				temp += R[n] * erx[n][b]; // Rab' x erb = Hessian
+
+			if(debug)
+				fprintf(stderr,"\tHab= %f\n",temp);
+
+			// hess_matrix[a+b*(b+1)/2] = temp; // Rab' x erb = Hessian
+			hess_matrix[ a * sizex + b ] = temp; // Rab' x erb = Hessian (square matrix upper triangular part including diagonal?)
+
+		}
+
+		/*
+		// Deleting unnecessary colums! (it saves much memory!)
+		if( c < size ) // if col. is deleteable
+		{
+			// Deleting "c" column from Uab (up-diagonal part)
+			for(int n=0; n <= c; n++)
+			{
+				uij_index = undh[n] + (undh[c]+1)*(undh[c]+2)/2; // translates from "squared" to "triangular" matrix elements
+
+				if(Uij[uij_index]!=NULL)
+				{
+					// Deleting Uab element
+					for(int m=0; m<6; m++)
+						free( Uij[uij_index][m] );
+					free( Uij[uij_index] );
+					Uij[uij_index]=NULL;
+				}
+			}
+		}
+		 */
+	}
+
+
+	/*
+	// Deleting 6 last Uab columns-rows
+	if(size>6)
+		//	if(size>3)
+		for(int a=0; a<6; a++)
+			//	for(int a=0; a<3; a++)
+		{
+			for(int b=a; b<6; b++)
+				//		for(int b=a; b<3; b++)
+			{
+				uij_index = undh[a] + (undh[b]+1)*(undh[b]+2)/2; // translates from "squared" to "triangular" matrix elements
+
+				if(Uij[uij_index]!=NULL)
+				{
+					// Deleting Uab element
+					for(int m=0; m<6; m++)
+						free( Uij[uij_index][m] );
+					free( Uij[uij_index] );
+					Uij[uij_index]=NULL;
+				}
+			}
+		}
+	free( Uij );
+	 */
+
+	//	for(i=0; i<num_units*(num_units+1)/2; i++)
+	//		free( unipa[i] );
+	//	free( unipa );
+
+	//	for(i=0;i<6;i++)
+	//	{
+	//		free( erx[i] ); // erx[6][size]
+	//		free( T[i] );
+	//	}
+	//	free( erx );
+	//	free( T );
+	//	free( undh );
+
+
+
+	// ************* Add entries corresponding to constraints ******************
+	// double v[3]; // some vector
+	double w[3]; // some vector
+	double wcv[3]; // some vector
+	double vw[3]; // some vector
+	double sum; // some buffers
+
+	// CA (pseudo)atom index of the Ct-anchor
+	k = nla + ifpa + 1;
+
+	// v = r_N - r_CA   (of Ct-anchor residue)
+	prod = 0.0;
+	for(c=0; c<3; c++)
+	{
+		v[c] = coord[3*(k-1) + c] - coord[3*k + c];
+		prod += pow(v[c], 2);
+	}
+	prod = sqrt(prod); // norm of r_CA - r_N
+
+	for(c=0; c<3; c++)
+		v[c] /= prod;
+
+	// w = r_C - r_CA   (of Ct-anchor residue)
+	prod = 0.0;
+	for(c=0; c<3; c++)
+	{
+		w[c] = coord[3*(k+1) + c] - coord[3*k + c];
+		prod += pow(w[c], 2);
+	}
+	prod = sqrt(prod); // norm of r_C - r_CA
+
+	for(c=0; c<3; c++)
+		w[c] /= prod;
+
+	// cosg = cos(v^w)
+	double cosg = v[0]*w[0] + v[1]*w[1] + v[2]*w[2];     // cos(ang(v,w))
+
+	// wcv = w - cosg*v  (difference between w and the projection of w into v; thus wcv is orthogonal to both v and vw, see next...)
+	for(c=0; c<3; c++)          // w - cosg*v
+		wcv[c] = w[c] - cosg*v[c];
+
+	// vw = v x w
+	vw[0] = v[1]*w[2] - v[2]*w[1];
+	vw[1] = v[2]*w[0] - v[0]*w[2];
+	vw[2] = v[0]*w[1] - v[1]*w[0];    //  v x w
+
+
+	int isi, jsi;
+	for(i=0, isi=0; i<size; i++, isi += sizex) // Mon: Screen "size" dihedrals
+	{
+		// Mon: CA motion of Ct-anchor is constrained
+		hess_matrix[isi+size  ] = der[(nla+1)*size+i].x; // CA pseudo-atom of Ct-anchor
+		hess_matrix[isi+size+1] = der[(nla+1)*size+i].y;
+		hess_matrix[isi+size+2] = der[(nla+1)*size+i].z;
+		// Mon: The effect of all derivatives on changing the wcv vector orientation and/or length must be zero.
+		sum  = der[nla*size+i].x * wcv[0]; // N pseudo-atom of Ct-anchor
+		sum += der[nla*size+i].y * wcv[1];
+		sum += der[nla*size+i].z * wcv[2];
+		hess_matrix[isi+size+3] = sum; // Mon: der * wcv
+		// Mon: Constraint the change in the displacement of the N atom of Ct-anchor vw The effect of all derivatives on changing the vw vector orientation and/or length must be zero.
+		sum  = der[nla*size+i].x * vw[0]; // N pseudo-atom of Ct-anchor
+		sum += der[nla*size+i].y * vw[1];
+		sum += der[nla*size+i].z * vw[2];
+		hess_matrix[isi+size+4] = sum; // Mon: der * vw
+		// Mon: The effect of all derivatives on changing the vw vector orientation and/or length must be zero.
+		sum  = der[(nla+2)*size+i].x * vw[0]; // CO pseudo-atom of Ct-anchor
+		sum += der[(nla+2)*size+i].y * vw[1];
+		sum += der[(nla+2)*size+i].z * vw[2];
+		hess_matrix[isi+size+5] = sum;
+	}
+	//***************************************************************
+
+	// fill in lower triangular part
+	for(i=0,isi=0; i<sizex; i++,isi+=sizex)
+		for(j=0,jsi=0; j<i; j++,jsi+=sizex)
+			hess_matrix[isi+j] = hess_matrix[jsi+i];
+
+}
+
+double *hessianFast_mon(float *coord, float *coordCA, trd *der, tri *props, twid *decint, int nipa, int ifr, int ilr, int size, int nco, int num_atoms)
+{
+	bool debug = false;
+	double prod,prod1;
+	int l,ind2,ind3,ls,ks;
+	double *dummy;
+	int prin, fin, j2, m, buff;
+	double r_alpha[3],r_beta[3],r[3],e[3];
+	double S[6][6],R[6],C[6][6],D[6][6],U[6][6];
+	double d,temp;
+	double v[6];
+	int resn,num_res,num_seg;
+	int index_res = 0;
+
+	if(debug)
+		printf("debug> WARNING! Using: hessianFast()\n");
+
+	// Allocate Bordered Hessian
+	int sizex = size + nco;
+	double *hess_matrix; // Bordered Hessian matrix
+	if( !(hess_matrix = (double *) malloc( sizex * sizex * sizeof(double)) ) ) // Square matrix
+	{
+		printf("Msg(hessianFast): I'm sorry, Hessian-Matrix memory allocation failed!\nForcing exit!\n");
+		exit(1);
+	}
+
+	int reglen = ilr - ifr + 1; // Loop length (all mobile residues)
+	int ifpa = props[ifr].k1; // Index of first (mobile) pseudo-atom of loop
+	//	int ilpa = ifpa + nla - 1; // Index of last (mobile) pseudo-atom of loop
+	int ilpa = props[ilr+1].k1 - 1; // Index of last (mobile) pseudo-atom of loop
+	int nla = ilpa - ifpa + 1; // Number of loop atoms (mobile) Check!
+
+	if(debug)
+		printf("Msg(hessianFast): nipa= %d  size= %d\n", nipa, size);
+
+	//	size--;
+	//	printf("Msg(hessianFast): nipa= %d  size= %d\n", nipa, size);
+
+	// ********************************************
+	// Storing ==> (ea, ea x ra) (== (eb, eb x rb) )
+	// ********************************************
+	double **erx;
+	erx = (double **) malloc( sizeof(double *) * 6); // erx[6]
+	for(int i=0;i<6;i++)
+		erx[i] = (double *) malloc( sizeof(double) * size); // erx[6][size]
+
+	int *undh; // returns the closest unit-index on the left side of the dihedral
+	undh = (int *) malloc( sizeof(int) * size );
+	int unat[num_atoms];
+
+	for(int x=0; x<num_atoms; x++)
+		unat[x] = 0; // all atoms belong to 0 unit by default (i.e. environment)
+
+	// ****************************************************************************
+	// * First, screening dihedrals to pre-compute (ea, ea x ra) and (eb, eb x rb) <-- diadic expresions
+	// ****************************************************************************
+	int k0 = 0; // first-NH + CA + last-CO model index
+
+	for(int i=0; i<ifr; i++)
+		k0 += props[i].nat;
+
+	if(debug)
+		printf("Msg(hessianFast): k0= %d\n", k0);
+
+	int num_units = 0;
+	int un_index = 0; // un_index=0 --> environment rigid unit (i.e. the initialized value), N-CA belong to environment too (they do not move at all)
+	int natom = 0;
+
+	// ---------------------------------------------------
+	// 1. BUILDING "erx" array and other auxiliary: "undh"
+	// ---------------------------------------------------
+
+	int i = 0; // Residue index for current residue
+	int j = 0; // Dihedral angle index
+	int k = 0; // Atom index for current residue
+	int kp = 0; // Atom index in loop context
+	int c = 0; // Coordinate index
+	int k1 = 0; // Index of first atom of current residue
+	int k2 = 0; // Index of last atom of current residue
+
+	//	for(i = ifr; i <= ifr+reglen; i++) // Screen loop residues, i.e. from 1st loop residue to Ct-anchor, inclusive.
+	for(i = ifr; i < ifr+reglen; i++) // Screen loop residues, i.e. from 1st loop residue to Ct-anchor (without Ct)
+	{
+		// 1st and last indices of atoms of residue
+		k1 = props[i].k1; // index of 1st atom in residue "i"
+		k2 = k1 + props[i].nat-1;
+
+		if(debug)
+			fprintf(stdout,"hessianFast> residue i=%d  nan=%d  nat=%d  k1= %d  k2= %d\n",i,props[i].nan,props[i].nat,k1,k2);
+
+		unat[k0] = un_index;  // the unit N atom belongs to
+		k0++; // update atom counter
+
+		// Vectors for PHI dihedral angles
+		// ----------------------------------
+		if(props[i].nan != 1) // NOT Proline, i.e. if it has a mobile angle PHI
+		{   // q_j = phi_i
+			if(debug)
+				fprintf(stdout,"hessianFast> residue_i= %3d  dihedral_j= %3d  --> PHI\n",i,j);
+
+			// y_lambda (NH pos 0)
+			e[0] = -coord[k1 * 3];
+			e[1] = -coord[k1 * 3 + 1];
+			e[2] = -coord[k1 * 3 + 2];
+			// CA pos 1
+			r[0] = coord[(k1+1) * 3];
+			r[1] = coord[(k1+1) * 3 + 1];
+			r[2] = coord[(k1+1) * 3 + 2];
+			// e_lambda
+			e[0] += r[0]; // NH --> CA
+			e[1] += r[1];
+			e[2] += r[2];
+
+			temp = sqrt( e[0] * e[0] + e[1] * e[1] + e[2] * e[2] ); // normalization factor
+			for ( m = 0; m < 3; m++ )
+				e[m] /= temp; // Unit vector normalization
+
+			// ea
+			erx[0][j] = e[0];
+			erx[1][j] = e[1];
+			erx[2][j] = e[2];
+			// ea x ra
+			erx[3][j] = e[1] * r[2] - e[2] * r[1];
+			erx[4][j] = e[2] * r[0] - e[0] * r[2];
+			erx[5][j] = e[0] * r[1] - e[1] * r[0];
+
+
+			undh[j] = un_index; // which unit has the "j" dihedral seen from the right (left side)
+
+			un_index++; // update if it has PHI
+
+			j++; // Update current dihedral variable index
+		}
+
+		//		if(i > ifr)  // Not-first-residue (1st residue N-CA is a single rigid unit)
+		//			un_index++;
+
+		unat[k0] = un_index;  // the unit CA atom belongs to
+		k0++; // update atom counter
+
+		// Vectors for PSI dihedral angles
+		// ----------------------------------
+
+		// if(i < ifr+reglen-1)  // Not-last-residue (last residue CA-C can be considered a rigid unit)
+		{
+			// q_j = psi_i  // all aminoacids have mobile PSI angle
+			if(debug)
+				fprintf(stdout,"hessianFast> residue_i= %3d  dihedral_j= %3d  --> PSI\n",i,j);
+
+			// get CA pos 1
+			r[0] = coord[(k1+1) * 3];
+			r[1] = coord[(k1+1) * 3 + 1];
+			r[2] = coord[(k1+1) * 3 + 2];
+			// get C pos 2 (C=O in 3BB2R) or (C in Full-Atom)
+			e[0] = coord[(k1+2) * 3];
+			e[1] = coord[(k1+2) * 3 + 1];
+			e[2] = coord[(k1+2) * 3 + 2];
+			// e_lambda ==> CA --> C (unit vector)
+			e[0] -= r[0];
+			e[1] -= r[1];
+			e[2] -= r[2];
+
+			temp = sqrt( e[0] * e[0] + e[1] * e[1] + e[2] * e[2] );
+			for ( m = 0; m < 3; m++ )
+				e[m] /= temp; // Unit vector normalization
+
+			// ea
+			erx[0][j] = e[0];
+			erx[1][j] = e[1];
+			erx[2][j] = e[2];
+			// ea x ra
+			erx[3][j] = e[1] * r[2] - e[2] * r[1];
+			erx[4][j] = e[2] * r[0] - e[0] * r[2];
+			erx[5][j] = e[0] * r[1] - e[1] * r[0];
+
+			undh[j] = un_index; // which unit has the "j" dihedral seen from the right (left side)
+
+			j++; // Update current dihedral variable index
+		}
+
+		if(i < ifr+reglen-1)  // Not-last-residue (last residue CA-C can be considered a rigid unit)
+			un_index++;
+		//		un_index++;
+
+		unat[k0] = un_index; // the unit C atom belongs to
+		k0++; // update atom counter
+
+	}
+
+	// MON: PHI at Ct anchor dihedral ????
+	undh[j] = un_index; // which unit has the "j" dihedral seen from the right (left side)
+
+
+	if(debug)
+		fprintf(stderr,"hessianFast> undh, unat, (ea, ea x ra) and (eb, eb x rb) initialized!\n");
+
+
+	if(debug)
+	{
+		fprintf(stderr,"hessianFast> (ea, ea x ra)\n");
+		for(int x=0; x<j; x++)
+		{
+			for(int y=0; y<6; y++)
+				fprintf(stderr," %f", erx[y][x]);
+			fprintf(stderr,"\n");
+		}
+
+
+		fprintf(stderr,"hessianFast> undh=");
+		for(int x=0; x<size; x++)
+			fprintf(stderr," [%d]=%d",x,undh[x]);
+
+		fprintf(stderr,"\nhessianFast> unat=");
+		for(int x=0; x<num_atoms; x++)
+		{
+			if(x % 32 == 0)
+				fprintf(stderr,"\n");
+			fprintf(stderr," %2d",unat[x]);
+		}
+		fprintf(stderr,"\n");
+	}
+
+	// ---------------------------------------------------------------------------
+	// 2. BUILDING "unipa" (array of "ipa"s indices for interacting pair of units)
+	// ---------------------------------------------------------------------------
+	// Tij related pre-computations (to get direct Tij computation)
+
+	//	num_units = un_index + 1 + 1; // Inter-unit variables (rot-trans) dont increase units number
+	num_units = un_index + 1; // total number of units --> M = size + 1
+
+	if(debug)
+		printf("Msg(hessianFast): Number of units: %ld (%d)\n",num_units,un_index);
+
+	int unipa_index;
+	int *p_int;
+	int **unipa;
+
+	// "unipa" stores "ipa"s indices of interacting atoms belonging to the same pair of units
+	// (triangular packing storage)
+	unipa = (int **) malloc( sizeof(int *) * num_units * ( num_units + 1) / 2 );
+
+	// "unipa" initialization
+	for(i=0; i < num_units * ( num_units + 1 ) / 2; i++)
+		unipa[i] = NULL;
+
+	if(debug)
+		printf("Msg(hessianFast): nipa=%d\n",nipa);
+
+	// Screening "ipa"s to build "unipa" and "nunipa" (this will lead further to direct Tij computation)
+	for(int index=0; index<nipa; index++) // screens contacts (k vs. l)
+	{
+
+		k = decint[index].k; // k atom index
+		l = decint[index].l; // l atom index
+		i = unat[k]; // unit index of "k" atom
+		j = unat[l]; // unit index of "l" atom
+
+		if(debug)
+			printf("Msg(hessianFast): unipa[%d] --> k= %d  l= %d  i= %d  j= %d\n",index,k,l,i,j);
+
+		if(i != j) 	// the same unit is rigid, inner contacts must not be taken into account!
+		{		// (as well as the non contacting pairs!)
+			// The following must be always true:  (k < l) && (i < j)
+			if( i > j )
+			{
+				buff = j;
+				j = i;
+				i = buff;
+			}
+
+			// translates from "squared" to "triangular" matrix elements
+			unipa_index = i + j*(j+1)/2;
+
+			// Allocating memory for the new element (memory efficient)
+			if(unipa[unipa_index] == NULL) // If not allocated yet... then it does it!
+			{
+				if( !(p_int = (int *) realloc( unipa[unipa_index], 2 * sizeof(int) ) ) )
+				{
+					printf("Msg(hessianFast): Memory allocation failed in realloc()!\nForcing exit!\n");
+					exit(1);
+				}
+				unipa[unipa_index] = p_int;
+				unipa[unipa_index][0] = 2;
+			}
+			else // If already allocated, then increases its size one int.
+			{
+				unipa[unipa_index][0]++; // Counts number of Interacting Pairs of Atoms between (i,j) units
+				if( !(p_int = (int *) realloc( unipa[unipa_index], unipa[unipa_index][0] * sizeof(int) ) ) )
+				{
+					printf("Msg(hessianFast): Memory allocation failed in realloc()!\nForcing exit!\n");
+					exit(1);
+				}
+				unipa[unipa_index] = p_int;
+			}
+
+			// Storing ipa index for k,l interacting pair of atoms
+			unipa[unipa_index][ unipa[unipa_index][0] - 1 ] = index;
+		}
+	}
+
+	if(debug)
+	{
+		fprintf(stderr, "Msg(hessianFast): UNIPA computed!\n");
+	}
+
+	// -----------------------------------------------------------------------------------
+	// 3. HESSIAN BUILDING from Uab elements:
+	// Fastest Hessian Matrix building up... (n^2...) + Some additional optimizations...
+	// Uab - Matrix Computation - (ec.23) Noguti & Go 1983 pp.3685-90
+	// -----------------------------------------------------------------------------------
+
+	// Hessian initialization
+	for(i=0; i < sizex * sizex; i++)
+		hess_matrix[i] = 0.0;
+
+	// Uabmn minimal-memory allocation (full-square + 6 cols. + Tij "on the fly" computation)
+	int uij_index = 0;
+	int uij1, uij2, uij3;
+
+	// MON: check "+1"
+	// +1 due to void element (when there are just Traslational/Rotational DoFs)
+	double ***Uij;
+	if( Uij = (double ***) malloc( sizeof(double **) * (num_units*(num_units+1)/2) ) ) // Uab[size]
+	{
+		for(i=0; i<(num_units*(num_units+1)/2); i++)
+			Uij[i] = NULL; // initialization
+	}
+	else
+	{
+		printf("Msg(hessianFast): Unable to allocate Uij-matrix!\n");
+		exit(1);
+	}
+
+	if(debug)
+		fprintf(stderr,"Uij size = %d\n", num_units*(num_units+1)/2);
+
+	// T memory allocation (6x6 matrix)
+	double **T;
+	T = (double **) malloc( sizeof(double *) * 6 );
+	for(int i=0; i<6; i++)
+		T[i] = (double *) malloc( sizeof(double) * 6 );
+
+	if(debug)
+		fprintf(stderr,"Uab Computation Main-Loop (Computing Tij elements on-the-fly)\n");
+
+	// Uab Computation Main-Loop (Computing Tij elements "on the fly")
+	// (Which "unipa" belongs to the "outher" units corresponding to "a" and "b" dihedrals)
+	for(int b= size-3, c= size+5; b >= 0; b--,c--) 	// b --> dihedrals (column)
+	{							// c --> deleteable col. index
+		for(int a=0; a <= b; a++)	 		// a --> dihedrals (row)
+		{ 						// it fills upper triangular part (including diagonal)
+			// Units "outside" (a,b) pair are: (undh[a],undh[b]+1)
+			uij_index = undh[a] + ( undh[b] + 1 ) * ( undh[b] + 2 ) / 2;
+			// uij_index = undh[a] + undh[b] * ( undh[b] + 1 ) / 2;
+
+			if(debug)
+				fprintf(stderr,"a= %d  b= %d  undh[a]= %d  undh[b]+1= %d  uij_index= %d\n", a, b, undh[a], undh[b]+1, uij_index);
+
+			//			fprintf(stderr,"%ld ",uij_index);
+
+			// Given there are two dihedrals per CA (aprox.), up to 4 Uab(ICs) contiguous positions
+			// are equal. In "Uij"(units) the same 4 ICs combination share the same Uij, thus
+			// the Uij for the 4 ICs combination should be computed only once!
+			if( Uij[uij_index] == NULL ) // If "Uij" is not computed yet (compute Uij only once!)
+			{
+				// "in situ" Uij memory allocation
+				if( Uij[uij_index] = (double **) malloc( sizeof(double *) * 6 ) )
+				{
+					for(int m=0; m<6; m++)
+					{
+						if( Uij[uij_index][m] = (double *) malloc( sizeof(double) * 6 ) )
+						{
+							for(int n=0; n<6; n++)
+								Uij[uij_index][m][n] = 0.0;
+						}
+						else
+						{ printf("Msg(hessianM): Unable to allocate an Uab-matrix element!\n"); exit(1); }
+					}
+				}
+				else
+				{ printf("Msg(hessianM): Unable to allocate an Uab-matrix element!\n"); exit(1); }
+
+				// Uab - Matrix Computation - (ec.23) Noguti & Go 1983 pp.3685-90
+				// Computing valid indices
+
+				// U(a,b+1)
+				if(undh[b]+1 < num_units-1 ) // if valid "uab1"
+					uij1 = undh[a] + (undh[b]+2)*(undh[b]+3)/2; // i= undh[a]  j= (undh[b]+1)+1
+
+				// U(a-1,b)
+				if( undh[a] > 0 )
+					uij2 = undh[a]-1 + (undh[b]+1)*(undh[b]+2) / 2; // Uab[ dhup[a-1] ][ dhright[b] ]
+
+				// U(a-1,b+1)
+				if( undh[a] > 0 && undh[b]+2 < num_units )
+					uij3 = undh[a]-1 + (undh[b]+2)*(undh[b]+3) / 2; // Uab[ dhup[a-1] ][ dhright[b+1] ]
+
+				if(debug)
+					fprintf(stderr,"\tUij: a=%d b=%d uij1(row=%d col=%d) uij2(row=%d col=%d) uij3(row=%d col=%d) \n",a,b,undh[a],undh[b]+2,undh[a]-1,undh[b]+1,undh[a]-1,undh[b]+2);
+
+				// Computing Uij element
+				if( unipa[uij_index] != NULL ) // if "a" and "b" 's units interact
+				{				// (whether they have ipas...) --> then, "T" must be computed
+					// Computing Tij element "on the fly"
+					// (ec.21) Noguti & Go 1983 pp.3685-90
+					calcTij( T, unipa[uij_index], unipa[uij_index][0], decint, coordCA );
+
+					if(debug)
+						fprintf(stderr,"\tTij computed\n");
+
+					// (ec.23) Noguti & Go 1983 pp.3685-90
+					if( undh[a] > 0 && undh[b]+1 < num_units-1 ) // In the middle... (most of them)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m]
+																	+ Uij[uij2][n][m]
+																				   - Uij[uij3][n][m]
+																								  + T[n][m];
+					}
+					else if( undh[a] == 0 && undh[b]+1 < num_units-1 ) // In the top row (execepting: 0,n  already computed above)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m]
+																	+ T[n][m];
+					}
+					else if( undh[a] > 0 && undh[b]+1 == num_units-1 ) // In the right column (execepting: 0,n)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij2][n][m]
+																	+ T[n][m];
+					}
+					else // a == 0 && b == size-1  (0,n)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = T[n][m];
+					}
+				}
+				else // if "a" and "b" 's units don't interact
+				{	 // (no ipas...) --> then, "T" computation is not necessary!
+					// fprintf(stderr,"\tTij not-computed\n");
+
+					if( undh[a] > 0 && undh[b]+1 < num_units-1 ) // In the middle... (most of them)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m]
+																	+ Uij[uij2][n][m]
+																				   - Uij[uij3][n][m];
+					}
+					else if( undh[a] == 0 && undh[b]+1 < num_units-1 ) // In the top row (execepting: 0,n  already computed above)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m];
+					}
+					else if( undh[a] > 0 && undh[b]+1 == num_units-1 ) // In the right column (execepting: 0,n)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij2][n][m];
+					}
+					// if no interaction, then no Tij addition to Uab needed!
+				}
+
+				// at this point, the Uij element is fully computed!
+
+				// Show Uij[]
+				if(debug)
+				{
+					fprintf(stderr,"Uij[%d] a=%d b=%d\n", uij_index, a, b);
+					for(int n=0;n<6;n++)
+						for(int m=0;m<6;m++)
+							fprintf(stderr," %f", Uij[uij_index][n][m]);
+					fprintf(stderr,"\n");
+				}
+
+			}   	// only if not computed yet!
+
+			// ****************************************************
+			// Rab - Matrix Computation
+			// Noguti & Go (1983) pp. 3685-90
+			// ****************************************************
+			// Rab Computation ( the same Single- or Multi- Chain)
+			// Table I. Noguti & Go 1983 pp.3685-90
+			// backbone vs. backbone --> Rab = Uab
+
+			// (ec.16) Noguti & Go 1983 pp.3685-90
+			// fprintf(stderr,"\tRij= ");
+			for(int n=0; n<6; n++)
+			{
+				R[n] = 0.0;
+				for(int m=0; m<6; m++)
+					R[n] += erx[m][a] * Uij[uij_index][m][n]; // era x Rab
+				// fprintf(stderr,"%f ",R[n]);
+			}
+			// fprintf(stderr,"\n");
+
+			temp = 0.0;
+			for(int n=0; n<6; n++)
+				temp += R[n] * erx[n][b]; // Rab' x erb = Hessian
+
+			if(debug)
+				fprintf(stderr,"\tHab= %f\n",temp);
+
+			// hess_matrix[a+b*(b+1)/2] = temp; // Rab' x erb = Hessian
+			hess_matrix[ a * sizex + b ] = temp; // Rab' x erb = Hessian (square matrix upper triangular part including diagonal?)
+
+		}
+
+		/*
+		// Deleting unnecessary colums! (it saves much memory!)
+		if( c < size ) // if col. is deleteable
+		{
+			// Deleting "c" column from Uab (up-diagonal part)
+			for(int n=0; n <= c; n++)
+			{
+				uij_index = undh[n] + (undh[c]+1)*(undh[c]+2)/2; // translates from "squared" to "triangular" matrix elements
+
+				if(Uij[uij_index]!=NULL)
+				{
+					// Deleting Uab element
+					for(int m=0; m<6; m++)
+						free( Uij[uij_index][m] );
+					free( Uij[uij_index] );
+					Uij[uij_index]=NULL;
+				}
+			}
+		}
+		 */
+	}
+
+
+	/*
+	// Deleting 6 last Uab columns-rows
+	if(size>6)
+		//	if(size>3)
+		for(int a=0; a<6; a++)
+			//	for(int a=0; a<3; a++)
+		{
+			for(int b=a; b<6; b++)
+				//		for(int b=a; b<3; b++)
+			{
+				uij_index = undh[a] + (undh[b]+1)*(undh[b]+2)/2; // translates from "squared" to "triangular" matrix elements
+
+				if(Uij[uij_index]!=NULL)
+				{
+					// Deleting Uab element
+					for(int m=0; m<6; m++)
+						free( Uij[uij_index][m] );
+					free( Uij[uij_index] );
+					Uij[uij_index]=NULL;
+				}
+			}
+		}
+	free( Uij );
+	 */
+
+	for(i=0; i<num_units*(num_units+1)/2; i++)
+		free( unipa[i] );
+	free( unipa );
+
+	for(i=0;i<6;i++)
+	{
+		free( erx[i] ); // erx[6][size]
+		free( T[i] );
+	}
+	free( erx );
+	free( T );
+	free( undh );
+
+
+
+	// ************* Add entries corresponding to constraints ******************
+	// double v[3]; // some vector
+	double w[3]; // some vector
+	double wcv[3]; // some vector
+	double vw[3]; // some vector
+	double sum; // some buffers
+
+	// CA (pseudo)atom index of the Ct-anchor
+	k = nla + ifpa + 1;
+
+	// v = r_N - r_CA   (of Ct-anchor residue)
+	prod = 0.0;
+	for(c=0; c<3; c++)
+	{
+		v[c] = coord[3*(k-1) + c] - coord[3*k + c];
+		prod += pow(v[c], 2);
+	}
+	prod = sqrt(prod); // norm of r_CA - r_N
+
+	for(c=0; c<3; c++)
+		v[c] /= prod;
+
+	// w = r_C - r_CA   (of Ct-anchor residue)
+	prod = 0.0;
+	for(c=0; c<3; c++)
+	{
+		w[c] = coord[3*(k+1) + c] - coord[3*k + c];
+		prod += pow(w[c], 2);
+	}
+	prod = sqrt(prod); // norm of r_C - r_CA
+
+	for(c=0; c<3; c++)
+		w[c] /= prod;
+
+	// cosg = cos(v^w)
+	double cosg = v[0]*w[0] + v[1]*w[1] + v[2]*w[2];     // cos(ang(v,w))
+
+	// wcv = w - cosg*v  (difference between w and the projection of w into v; thus wcv is orthogonal to both v and vw, see next...)
+	for(c=0; c<3; c++)          // w - cosg*v
+		wcv[c] = w[c] - cosg*v[c];
+
+	// vw = v x w
+	vw[0] = v[1]*w[2] - v[2]*w[1];
+	vw[1] = v[2]*w[0] - v[0]*w[2];
+	vw[2] = v[0]*w[1] - v[1]*w[0];    //  v x w
+
+
+	int isi, jsi;
+	for(i=0, isi=0; i<size; i++, isi += sizex) // Mon: Screen "size" dihedrals
+	{
+		// Mon: CA motion of Ct-anchor is constrained
+		hess_matrix[isi+size  ] = der[(nla+1)*size+i].x; // CA pseudo-atom of Ct-anchor
+		hess_matrix[isi+size+1] = der[(nla+1)*size+i].y;
+		hess_matrix[isi+size+2] = der[(nla+1)*size+i].z;
+		// Mon: The effect of all derivatives on changing the wcv vector orientation and/or length must be zero.
+		sum  = der[nla*size+i].x * wcv[0]; // N pseudo-atom of Ct-anchor
+		sum += der[nla*size+i].y * wcv[1];
+		sum += der[nla*size+i].z * wcv[2];
+		hess_matrix[isi+size+3] = sum; // Mon: der * wcv
+		// Mon: Constraint the change in the displacement of the N atom of Ct-anchor vw The effect of all derivatives on changing the vw vector orientation and/or length must be zero.
+		sum  = der[nla*size+i].x * vw[0]; // N pseudo-atom of Ct-anchor
+		sum += der[nla*size+i].y * vw[1];
+		sum += der[nla*size+i].z * vw[2];
+		hess_matrix[isi+size+4] = sum; // Mon: der * vw
+		// Mon: The effect of all derivatives on changing the vw vector orientation and/or length must be zero.
+		sum  = der[(nla+2)*size+i].x * vw[0]; // CO pseudo-atom of Ct-anchor
+		sum += der[(nla+2)*size+i].y * vw[1];
+		sum += der[(nla+2)*size+i].z * vw[2];
+		hess_matrix[isi+size+5] = sum;
+	}
+	//***************************************************************
+
+	// fill in lower triangular part
+	for(i=0,isi=0; i<sizex; i++,isi+=sizex)
+		for(j=0,jsi=0; j<i; j++,jsi+=sizex)
+			hess_matrix[isi+j] = hess_matrix[jsi+i];
+
+
+	return( hess_matrix ); // outputs Hessian Matrix
+}
+
+double *hessianFast(float *coord, float *coordCA, trd *der, tri *props, twid *decint, int nipa,  int ifr, int ilr, int size, int nco, int num_atoms)
+{
+	bool debug = false;
+	double prod,prod1;
+	int l,ind2,ind3,ls,ks;
+	double *dummy;
+	int prin, fin, j2, m, buff;
+	double r_alpha[3],r_beta[3],r[3],e[3];
+	double S[6][6],R[6],C[6][6],D[6][6],U[6][6];
+	double d,temp;
+	double v[6];
+	int resn,num_res,num_seg;
+	int index_res = 0;
+
+	if(debug)
+		printf("debug> WARNING! Using: hessianFast() nipa %d ifr %d ilr %d size %d nco %d num_atoms %d\n", nipa, ifr, ilr, size, nco, num_atoms);
+
+	// Allocate Bordered Hessian
+	int sizex = size + nco;
+	double *hess_matrix; // Bordered Hessian matrix
+	if( !(hess_matrix = (double *) malloc( sizex * sizex * sizeof(double)) ) ) // Square matrix
+	{
+		printf("Msg(hessianFast): I'm sorry, Hessian-Matrix memory allocation failed!\nForcing exit!\n");
+		exit(1);
+	}
+
+	int reglen = ilr - ifr + 1; // Loop length (all mobile residues)
+	int ifpa = props[ifr].k1; // Index of first (mobile) pseudo-atom of loop
+	//	int ilpa = ifpa + nla - 1; // Index of last (mobile) pseudo-atom of loop
+	int ilpa = props[ilr+1].k1 - 1; // Index of last (mobile) pseudo-atom of loop
+	int nla = ilpa - ifpa + 1; // Number of loop atoms (mobile) Check!
+
+	if(debug)
+		printf("Msg(hessianFast): nipa= %d  size= %d\n", nipa, size);
+
+	//	size--;
+	//	printf("Msg(hessianFast): nipa= %d  size= %d\n", nipa, size);
+
+	// ********************************************
+	// Storing ==> (ea, ea x ra) (== (eb, eb x rb) )
+	// ********************************************
+	//		double **erx;
+	//		erx = (double **) malloc( sizeof(double *) * 6); // erx[6]
+	//		for(int i=0;i<6;i++)
+	//		erx[i] = (double *) malloc( sizeof(double) * size); // erx[6][size]
+	//
+	//		int *undh; // returns the closest unit-index on the left side of the dihedral
+	//		undh = (int *) malloc( sizeof(int) * size );
+	double erx[6][size];
+	int undh[size];
+
+	int unat[num_atoms];
+
+	for(int x=0; x<num_atoms; x++)
+		unat[x] = 0; // all atoms belong to 0 unit by default (i.e. environment)
+
+	// ****************************************************************************
+	// * First, screening dihedrals to pre-compute (ea, ea x ra) and (eb, eb x rb) <-- diadic expresions
+	// ****************************************************************************
+	int k0 = 0; // first-NH + CA + last-CO model index
+
+	for(int i=0; i<ifr; i++)
+		k0 += props[i].nat;
+
+	if(debug)
+		printf("Msg(hessianFast): k0= %d\n", k0);
+
+	int num_units = 0;
+	int un_index = 0; // un_index=0 --> environment rigid unit (i.e. the initialized value), N-CA belong to environment too (they do not move at all)
+	int natom = 0;
+
+	// ---------------------------------------------------
+	// 1. BUILDING "erx" array and other auxiliary: "undh"
+	// ---------------------------------------------------
+
+	int i = 0; // Residue index for current residue
+	int j = 0; // Dihedral angle index
+	int k = 0; // Atom index for current residue
+	int kp = 0; // Atom index in loop context
+	int c = 0; // Coordinate index
+	int k1 = 0; // Index of first atom of current residue
+	int k2 = 0; // Index of last atom of current residue
+
+	//	for(i = ifr; i <= ifr+reglen; i++) // Screen loop residues, i.e. from 1st loop residue to Ct-anchor, inclusive.
+	for(i = ifr; i < ifr+reglen; i++) // Screen loop residues, i.e. from 1st loop residue to Ct-anchor (without Ct)
+	{
+		// 1st and last indices of atoms of residue
+		k1 = props[i].k1; // index of 1st atom in residue "i"
+		k2 = k1 + props[i].nat-1;
+
+		if(debug)
+			fprintf(stdout,"hessianFast> residue i=%d  nan=%d  nat=%d  k1= %d  k2= %d\n",i,props[i].nan,props[i].nat,k1,k2);
+
+		unat[k0] = un_index;  // the unit N atom belongs to
+		k0++; // update atom counter
+
+		// Vectors for PHI dihedral angles
+		// ----------------------------------
+		if(props[i].nan != 1) // NOT Proline, i.e. if it has a mobile angle PHI
+		{   // q_j = phi_i
+			if(debug)
+				fprintf(stdout,"hessianFast> residue_i= %3d  dihedral_j= %3d  --> PHI\n",i,j);
+
+			// y_lambda (NH pos 0)
+			e[0] = -coord[k1 * 3];
+			e[1] = -coord[k1 * 3 + 1];
+			e[2] = -coord[k1 * 3 + 2];
+			// CA pos 1
+			r[0] = coord[(k1+1) * 3];
+			r[1] = coord[(k1+1) * 3 + 1];
+			r[2] = coord[(k1+1) * 3 + 2];
+			// e_lambda
+			e[0] += r[0]; // NH --> CA
+			e[1] += r[1];
+			e[2] += r[2];
+
+			temp = sqrt( e[0] * e[0] + e[1] * e[1] + e[2] * e[2] ); // normalization factor
+			for ( m = 0; m < 3; m++ )
+				e[m] /= temp; // Unit vector normalization
+
+			// ea
+			erx[0][j] = e[0];
+			erx[1][j] = e[1];
+			erx[2][j] = e[2];
+			// ea x ra
+			erx[3][j] = e[1] * r[2] - e[2] * r[1];
+			erx[4][j] = e[2] * r[0] - e[0] * r[2];
+			erx[5][j] = e[0] * r[1] - e[1] * r[0];
+
+
+			undh[j] = un_index; // which unit has the "j" dihedral seen from the right (left side)
+
+			un_index++; // update if it has PHI
+
+			j++; // Update current dihedral variable index
+		}
+
+		//		if(i > ifr)  // Not-first-residue (1st residue N-CA is a single rigid unit)
+		//			un_index++;
+
+		unat[k0] = un_index;  // the unit CA atom belongs to
+		k0++; // update atom counter
+
+		// Vectors for PSI dihedral angles
+		// ----------------------------------
+
+		// if(i < ifr+reglen-1)  // Not-last-residue (last residue CA-C can be considered a rigid unit)
+		{
+			// q_j = psi_i  // all aminoacids have mobile PSI angle
+			if(debug)
+				fprintf(stdout,"hessianFast> residue_i= %3d  dihedral_j= %3d  --> PSI\n",i,j);
+
+			// get CA pos 1
+			r[0] = coord[(k1+1) * 3];
+			r[1] = coord[(k1+1) * 3 + 1];
+			r[2] = coord[(k1+1) * 3 + 2];
+			// get C pos 2 (C=O in 3BB2R) or (C in Full-Atom)
+			e[0] = coord[(k1+2) * 3];
+			e[1] = coord[(k1+2) * 3 + 1];
+			e[2] = coord[(k1+2) * 3 + 2];
+			// e_lambda ==> CA --> C (unit vector)
+			e[0] -= r[0];
+			e[1] -= r[1];
+			e[2] -= r[2];
+
+			temp = sqrt( e[0] * e[0] + e[1] * e[1] + e[2] * e[2] );
+			for ( m = 0; m < 3; m++ )
+				e[m] /= temp; // Unit vector normalization
+
+			// ea
+			erx[0][j] = e[0];
+			erx[1][j] = e[1];
+			erx[2][j] = e[2];
+			// ea x ra
+			erx[3][j] = e[1] * r[2] - e[2] * r[1];
+			erx[4][j] = e[2] * r[0] - e[0] * r[2];
+			erx[5][j] = e[0] * r[1] - e[1] * r[0];
+
+			undh[j] = un_index; // which unit has the "j" dihedral seen from the right (left side)
+
+			j++; // Update current dihedral variable index
+		}
+
+		if(i < ifr+reglen-1)  // Not-last-residue (last residue CA-C can be considered a rigid unit)
+			un_index++;
+		//		un_index++;
+
+		unat[k0] = un_index; // the unit C atom belongs to
+		k0++; // update atom counter
+
+	}
+
+	// MON: PHI at Ct anchor dihedral ????
+	undh[j] = un_index; // which unit has the "j" dihedral seen from the right (left side)
+
+
+	if(debug)
+		fprintf(stderr,"hessianFast> undh, unat, (ea, ea x ra) and (eb, eb x rb) initialized!\n");
+
+
+	if(debug)
+	{
+		fprintf(stderr,"hessianFast> (ea, ea x ra)\n");
+		for(int x=0; x<j; x++)
+		{
+			for(int y=0; y<6; y++)
+				fprintf(stderr," %f", erx[y][x]);
+			fprintf(stderr,"\n");
+		}
+
+
+		fprintf(stderr,"hessianFast> undh=");
+		for(int x=0; x<size; x++)
+			fprintf(stderr," [%d]=%d",x,undh[x]);
+
+		fprintf(stderr,"\nhessianFast> unat=");
+		for(int x=0; x<num_atoms; x++)
+		{
+			if(x % 32 == 0)
+				fprintf(stderr,"\n");
+			fprintf(stderr," %2d",unat[x]);
+		}
+		fprintf(stderr,"\n");
+	}
+
+	// ---------------------------------------------------------------------------
+	// 2. BUILDING "unipa" (array of "ipa"s indices for interacting pair of units)
+	// ---------------------------------------------------------------------------
+	// Tij related pre-computations (to get direct Tij computation)
+
+	//	num_units = un_index + 1 + 1; // Inter-unit variables (rot-trans) dont increase units number
+	num_units = un_index + 1; // total number of units --> M = size + 1
+
+	if(debug)
+		printf("Msg(hessianFast): Number of units: %ld (%d)\n",num_units,un_index);
+
+	int unipa_index;
+	int *p_int;
+	// int **unipa;
+
+	// "unipa" stores "ipa"s indices of interacting atoms belonging to the same pair of units
+	// (triangular packing storage)
+	// unipa = (int **) malloc( sizeof(int *) * num_units * ( num_units + 1) / 2 );
+
+	// "unipa" initialization
+	//	for(i=0; i < num_units * ( num_units + 1 ) / 2; i++)
+	//		unipa[i] = (int *) malloc( sizeof(int) * 500); ;
+	//
+	//	for(i=0; i < num_units * ( num_units + 1 ) / 2; i++)
+	//		unipa[i][0]=0;
+
+	int unipa[num_units * ( num_units + 1) / 2 ][500];
+
+	for(i=0; i < num_units * ( num_units + 1 ) / 2; i++)
+		unipa[i][0]=0;
+
+	if(debug)
+		printf("Msg(hessianFast): nipa=%d\n",nipa);
+
+	// Screening "ipa"s to build "unipa" and "nunipa" (this will lead further to direct Tij computation)
+	for(int index=0; index<nipa; index++) // screens contacts (k vs. l)
+	{
+
+		k = decint[index].k; // k atom index
+		l = decint[index].l; // l atom index
+		i = unat[k]; // unit index of "k" atom
+		j = unat[l]; // unit index of "l" atom
+
+		if(debug)
+			printf("Msg(hessianFast): unipa[%d] --> k= %d  l= %d  i= %d  j= %d\n",index,k,l,i,j);
+
+		if(i != j) 	// the same unit is rigid, inner contacts must not be taken into account!
+		{		// (as well as the non contacting pairs!)
+			// The following must be always true:  (k < l) && (i < j)
+			if( i > j )
+			{
+				buff = j;
+				j = i;
+				i = buff;
+			}
+
+			// translates from "squared" to "triangular" matrix elements
+			unipa_index = i + j*(j+1)/2;
+
+
+
+			//			// Allocating memory for the new element (memory efficient)
+			//			if(unipa[unipa_index] == NULL) // If not allocated yet... then it does it!
+			//			{
+			//				if( !(p_int = (int *) realloc( unipa[unipa_index], 2 * sizeof(int) ) ) )
+			//				{
+			//					printf("Msg(hessianFast): Memory allocation failed in realloc()!\nForcing exit!\n");
+			//					exit(1);
+			//				}
+			//				unipa[unipa_index] = p_int;
+			//				unipa[unipa_index][0] = 2;
+			//			}
+			//			else // If already allocated, then increases its size one int.
+			//			{
+			//				unipa[unipa_index][0]++; // Counts number of Interacting Pairs of Atoms between (i,j) units
+			//				if( !(p_int = (int *) realloc( unipa[unipa_index], unipa[unipa_index][0] * sizeof(int) ) ) )
+			//				{
+			//					printf("Msg(hessianFast): Memory allocation failed in realloc()!\nForcing exit!\n");
+			//					exit(1);
+			//				}
+			//				unipa[unipa_index] = p_int;
+			//			}
+
+			if (unipa[unipa_index][0] == 0)
+				unipa[unipa_index][0] = 1;
+
+			unipa[unipa_index][0]++;
+
+			// Storing ipa index for k,l interacting pair of atoms
+			unipa[unipa_index][ unipa[unipa_index][0] - 1 ] = index;
+		}
+	}
+
+	if(debug)
+	{
+		fprintf(stderr, "Msg(hessianFast): UNIPA computed!\n");
+	}
+
+	// -----------------------------------------------------------------------------------
+	// 3. HESSIAN BUILDING from Uab elements:
+	// Fastest Hessian Matrix building up... (n^2...) + Some additional optimizations...
+	// Uab - Matrix Computation - (ec.23) Noguti & Go 1983 pp.3685-90
+	// -----------------------------------------------------------------------------------
+
+	// Hessian initialization
+	for(i=0; i < sizex * sizex; i++)
+		hess_matrix[i] = 0.0;
+
+	// Uabmn minimal-memory allocation (full-square + 6 cols. + Tij "on the fly" computation)
+	int uij_index = 0;
+	int uij1, uij2, uij3;
+
+	// MON: check "+1"
+	// +1 due to void element (when there are just Traslational/Rotational DoFs)
+	double ***Uij;
+	if( Uij = (double ***) malloc( sizeof(double **) * (num_units*(num_units+1)/2) ) ) // Uab[size]
+	{
+		for(i=0; i<(num_units*(num_units+1)/2); i++)
+			Uij[i] = NULL; // initialization
+	}
+	else
+	{
+		printf("Msg(hessianFast): Unable to allocate Uij-matrix!\n");
+		exit(1);
+	}
+
+	if(debug)
+		fprintf(stderr,"Uij size = %d\n", num_units*(num_units+1)/2);
+
+	// T memory allocation (6x6 matrix)
+	//double **T;
+	//	T = (double **) malloc( sizeof(double *) * 6 );
+	//	for(int i=0; i<6; i++)
+	//	T[i] = (double *) malloc( sizeof(double) * 6 );
+	double T[6][6];
+
+	if(debug)
+		fprintf(stderr,"Uab Computation Main-Loop (Computing Tij elements on-the-fly)\n");
+
+	// Uab Computation Main-Loop (Computing Tij elements "on the fly")
+	// (Which "unipa" belongs to the "outher" units corresponding to "a" and "b" dihedrals)
+	for(int b= size-3, c= size+5; b >= 0; b--,c--) 	// b --> dihedrals (column)
+	{							// c --> deleteable col. index
+		for(int a=0; a <= b; a++)	 		// a --> dihedrals (row)
+		{ 						// it fills upper triangular part (including diagonal)
+			// Units "outside" (a,b) pair are: (undh[a],undh[b]+1)
+			uij_index = undh[a] + ( undh[b] + 1 ) * ( undh[b] + 2 ) / 2;
+			// uij_index = undh[a] + undh[b] * ( undh[b] + 1 ) / 2;
+
+			if(debug)
+				fprintf(stderr,"a= %d  b= %d  undh[a]= %d  undh[b]+1= %d  uij_index= %d\n", a, b, undh[a], undh[b]+1, uij_index);
+
+			//			fprintf(stderr,"%ld ",uij_index);
+
+			// Given there are two dihedrals per CA (aprox.), up to 4 Uab(ICs) contiguous positions
+			// are equal. In "Uij"(units) the same 4 ICs combination share the same Uij, thus
+			// the Uij for the 4 ICs combination should be computed only once!
+			if( Uij[uij_index] == NULL ) // If "Uij" is not computed yet (compute Uij only once!)
+			{
+				// "in situ" Uij memory allocation
+				if( Uij[uij_index] = (double **) malloc( sizeof(double *) * 6 ) )
+				{
+					for(int m=0; m<6; m++)
+					{
+						if( Uij[uij_index][m] = (double *) malloc( sizeof(double) * 6 ) )
+						{
+							for(int n=0; n<6; n++)
+								Uij[uij_index][m][n] = 0.0;
+						}
+						else
+						{ printf("Msg(hessianM): Unable to allocate an Uab-matrix element!\n"); exit(1); }
+					}
+				}
+				else
+				{ printf("Msg(hessianM): Unable to allocate an Uab-matrix element!\n"); exit(1); }
+
+				// Uab - Matrix Computation - (ec.23) Noguti & Go 1983 pp.3685-90
+				// Computing valid indices
+
+				// U(a,b+1)
+				if(undh[b]+1 < num_units-1 ) // if valid "uab1"
+					uij1 = undh[a] + (undh[b]+2)*(undh[b]+3)/2; // i= undh[a]  j= (undh[b]+1)+1
+
+				// U(a-1,b)
+				if( undh[a] > 0 )
+					uij2 = undh[a]-1 + (undh[b]+1)*(undh[b]+2) / 2; // Uab[ dhup[a-1] ][ dhright[b] ]
+
+				// U(a-1,b+1)
+				if( undh[a] > 0 && undh[b]+2 < num_units )
+					uij3 = undh[a]-1 + (undh[b]+2)*(undh[b]+3) / 2; // Uab[ dhup[a-1] ][ dhright[b+1] ]
+
+				if(debug)
+					fprintf(stderr,"\tUij: a=%d b=%d uij1(row=%d col=%d) uij2(row=%d col=%d) uij3(row=%d col=%d) \n",a,b,undh[a],undh[b]+2,undh[a]-1,undh[b]+1,undh[a]-1,undh[b]+2);
+
+				// Computing Uij element
+				if( unipa[uij_index] != NULL ) // if "a" and "b" 's units interact
+				{				// (whether they have ipas...) --> then, "T" must be computed
+					// Computing Tij element "on the fly"
+					// (ec.21) Noguti & Go 1983 pp.3685-90
+					//	calcTij( T, unipa[uij_index], unipa[uij_index][0], decint, coordCA );
+
+
+					double r_alpha[3];
+					double r_beta[3];
+					double v[6];
+
+					for(int i=0; i<6; i++)
+						for(int j=0; j<6; j++)
+							T[i][j] = 0.0; // T initialization
+
+					for(int i=1; i < unipa[uij_index][0]; i++) // screens inter-unit contacts (k vs. l)
+					{
+						int in=unipa[uij_index][i];
+						int ki = 3*decint[in].k;
+						int li = 3*decint[in].l;
+
+						// k-atom position retrieval (alpha)
+						r_alpha[0] = coordCA[ki];
+						r_alpha[1] = coordCA[ki + 1];
+						r_alpha[2] = coordCA[ki + 2];
+
+						// l-atom position retrieval (beta)
+						r_beta[0] = coordCA[li];
+						r_beta[1] = coordCA[li + 1];
+						r_beta[2] = coordCA[li + 2];
+
+						// D-Matrix
+						v[0] = r_alpha[1] * r_beta[2] - r_alpha[2] * r_beta[1];
+						v[1] = r_alpha[2] * r_beta[0] - r_alpha[0] * r_beta[2];
+						v[2] = r_alpha[0] * r_beta[1] - r_alpha[1] * r_beta[0];
+						v[3] = r_alpha[0] - r_beta[0];
+						v[4] = r_alpha[1] - r_beta[1];
+						v[5] = r_alpha[2] - r_beta[2];
+						// double d1 = decint[in].C / pow(decint[in].d,2);
+						double d1 = decint[in].C / decint[in].d;
+
+						//fprintf(stderr,"%f %f %f %d %d\n", d1, decint[in].C , decint[in].d, ki, li);
+						for(int n=0;n<6;n++) // Diadic product
+							for(int m=0;m<6;m++)
+								T[n][m] += d1 * v[n] * v[m]; // Storing S-matrix
+					}
+
+
+
+
+					if(debug)
+						fprintf(stderr,"\tTij computed\n");
+
+					// (ec.23) Noguti & Go 1983 pp.3685-90
+					if( undh[a] > 0 && undh[b]+1 < num_units-1 ) // In the middle... (most of them)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m]
+																	+ Uij[uij2][n][m]
+																				   - Uij[uij3][n][m]
+																								  + T[n][m];
+					}
+					else if( undh[a] == 0 && undh[b]+1 < num_units-1 ) // In the top row (execepting: 0,n  already computed above)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m]
+																	+ T[n][m];
+					}
+					else if( undh[a] > 0 && undh[b]+1 == num_units-1 ) // In the right column (execepting: 0,n)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij2][n][m]
+																	+ T[n][m];
+					}
+					else // a == 0 && b == size-1  (0,n)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = T[n][m];
+					}
+				}
+				else // if "a" and "b" 's units don't interact
+				{	 // (no ipas...) --> then, "T" computation is not necessary!
+					// fprintf(stderr,"\tTij not-computed\n");
+
+					if( undh[a] > 0 && undh[b]+1 < num_units-1 ) // In the middle... (most of them)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m]
+																	+ Uij[uij2][n][m]
+																				   - Uij[uij3][n][m];
+					}
+					else if( undh[a] == 0 && undh[b]+1 < num_units-1 ) // In the top row (execepting: 0,n  already computed above)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij1][n][m];
+					}
+					else if( undh[a] > 0 && undh[b]+1 == num_units-1 ) // In the right column (execepting: 0,n)
+					{
+						for(int n=0;n<6;n++)
+							for(int m=0;m<6;m++)
+								Uij[uij_index][n][m] = Uij[uij2][n][m];
+					}
+					// if no interaction, then no Tij addition to Uab needed!
+				}
+
+				// at this point, the Uij element is fully computed!
+
+				// Show Uij[]
+				if(debug)
+				{
+					fprintf(stderr,"Uij[%d] a=%d b=%d\n", uij_index, a, b);
+					for(int n=0;n<6;n++)
+						for(int m=0;m<6;m++)
+							fprintf(stderr," %f", Uij[uij_index][n][m]);
+					fprintf(stderr,"\n");
+				}
+
+			}   	// only if not computed yet!
+
+			// ****************************************************
+			// Rab - Matrix Computation
+			// Noguti & Go (1983) pp. 3685-90
+			// ****************************************************
+			// Rab Computation ( the same Single- or Multi- Chain)
+			// Table I. Noguti & Go 1983 pp.3685-90
+			// backbone vs. backbone --> Rab = Uab
+
+			// (ec.16) Noguti & Go 1983 pp.3685-90
+			// fprintf(stderr,"\tRij= ");
+			for(int n=0; n<6; n++)
+			{
+				R[n] = 0.0;
+				for(int m=0; m<6; m++)
+					R[n] += erx[m][a] * Uij[uij_index][m][n]; // era x Rab
+				// fprintf(stderr,"%f ",R[n]);
+			}
+			// fprintf(stderr,"\n");
+
+			temp = 0.0;
+			for(int n=0; n<6; n++)
+				temp += R[n] * erx[n][b]; // Rab' x erb = Hessian
+
+			if(debug)
+				fprintf(stderr,"\tHab= %f\n",temp);
+
+			// hess_matrix[a+b*(b+1)/2] = temp; // Rab' x erb = Hessian
+			hess_matrix[ a * sizex + b ] = temp; // Rab' x erb = Hessian (square matrix upper triangular part including diagonal?)
+
+		}
+
+		/*
+		// Deleting unnecessary colums! (it saves much memory!)
+		if( c < size ) // if col. is deleteable
+		{
+			// Deleting "c" column from Uab (up-diagonal part)
+			for(int n=0; n <= c; n++)
+			{
+				uij_index = undh[n] + (undh[c]+1)*(undh[c]+2)/2; // translates from "squared" to "triangular" matrix elements
+
+				if(Uij[uij_index]!=NULL)
+				{
+					// Deleting Uab element
+					for(int m=0; m<6; m++)
+						free( Uij[uij_index][m] );
+					free( Uij[uij_index] );
+					Uij[uij_index]=NULL;
+				}
+			}
+		}
+		 */
+	}
+
+
+	/*
+	// Deleting 6 last Uab columns-rows
+	if(size>6)
+		//	if(size>3)
+		for(int a=0; a<6; a++)
+			//	for(int a=0; a<3; a++)
+		{
+			for(int b=a; b<6; b++)
+				//		for(int b=a; b<3; b++)
+			{
+				uij_index = undh[a] + (undh[b]+1)*(undh[b]+2)/2; // translates from "squared" to "triangular" matrix elements
+
+				if(Uij[uij_index]!=NULL)
+				{
+					// Deleting Uab element
+					for(int m=0; m<6; m++)
+						free( Uij[uij_index][m] );
+					free( Uij[uij_index] );
+					Uij[uij_index]=NULL;
+				}
+			}
+		}
+	free( Uij );
+	 */
+
+	//	for(i=0; i<num_units*(num_units+1)/2; i++)
+	//		free( unipa[i] );
+	//	free( unipa );
+
+	//	for(i=0;i<6;i++)
+	//	{
+	//		free( erx[i] ); // erx[6][size]
+	//		free( T[i] );
+	//	}
+	//	free( erx );
+	//	free( T );
+	//	free( undh );
+
+
+
+	// ************* Add entries corresponding to constraints ******************
+	// double v[3]; // some vector
+	double w[3]; // some vector
+	double wcv[3]; // some vector
+	double vw[3]; // some vector
+	double sum; // some buffers
+
+	// CA (pseudo)atom index of the Ct-anchor
+	k = nla + ifpa + 1;
+
+	// v = r_N - r_CA   (of Ct-anchor residue)
+	prod = 0.0;
+	for(c=0; c<3; c++)
+	{
+		v[c] = coord[3*(k-1) + c] - coord[3*k + c];
+		prod += pow(v[c], 2);
+	}
+	prod = sqrt(prod); // norm of r_CA - r_N
+
+	for(c=0; c<3; c++)
+		v[c] /= prod;
+
+	// w = r_C - r_CA   (of Ct-anchor residue)
+	prod = 0.0;
+	for(c=0; c<3; c++)
+	{
+		w[c] = coord[3*(k+1) + c] - coord[3*k + c];
+		prod += pow(w[c], 2);
+	}
+	prod = sqrt(prod); // norm of r_C - r_CA
+
+	for(c=0; c<3; c++)
+		w[c] /= prod;
+
+	// cosg = cos(v^w)
+	double cosg = v[0]*w[0] + v[1]*w[1] + v[2]*w[2];     // cos(ang(v,w))
+
+	// wcv = w - cosg*v  (difference between w and the projection of w into v; thus wcv is orthogonal to both v and vw, see next...)
+	for(c=0; c<3; c++)          // w - cosg*v
+		wcv[c] = w[c] - cosg*v[c];
+
+	// vw = v x w
+	vw[0] = v[1]*w[2] - v[2]*w[1];
+	vw[1] = v[2]*w[0] - v[0]*w[2];
+	vw[2] = v[0]*w[1] - v[1]*w[0];    //  v x w
+
+
+	int isi, jsi;
+	for(i=0, isi=0; i<size; i++, isi += sizex) // Mon: Screen "size" dihedrals
+	{
+		// Mon: CA motion of Ct-anchor is constrained
+		hess_matrix[isi+size  ] = der[(nla+1)*size+i].x; // CA pseudo-atom of Ct-anchor
+		hess_matrix[isi+size+1] = der[(nla+1)*size+i].y;
+		hess_matrix[isi+size+2] = der[(nla+1)*size+i].z;
+		// Mon: The effect of all derivatives on changing the wcv vector orientation and/or length must be zero.
+		sum  = der[nla*size+i].x * wcv[0]; // N pseudo-atom of Ct-anchor
+		sum += der[nla*size+i].y * wcv[1];
+		sum += der[nla*size+i].z * wcv[2];
+		hess_matrix[isi+size+3] = sum; // Mon: der * wcv
+		// Mon: Constraint the change in the displacement of the N atom of Ct-anchor vw The effect of all derivatives on changing the vw vector orientation and/or length must be zero.
+		sum  = der[nla*size+i].x * vw[0]; // N pseudo-atom of Ct-anchor
+		sum += der[nla*size+i].y * vw[1];
+		sum += der[nla*size+i].z * vw[2];
+		hess_matrix[isi+size+4] = sum; // Mon: der * vw
+		// Mon: The effect of all derivatives on changing the vw vector orientation and/or length must be zero.
+		sum  = der[(nla+2)*size+i].x * vw[0]; // CO pseudo-atom of Ct-anchor
+		sum += der[(nla+2)*size+i].y * vw[1];
+		sum += der[(nla+2)*size+i].z * vw[2];
+		hess_matrix[isi+size+5] = sum;
+	}
+	//***************************************************************
+
+	// fill in lower triangular part
+	for(i=0,isi=0; i<sizex; i++,isi+=sizex)
+		for(j=0,jsi=0; j<i; j++,jsi+=sizex)
+			hess_matrix[isi+j] = hess_matrix[jsi+i];
+
+	return( hess_matrix ); // outputs Hessian Matrix
+
+}
+
+
+
+
+// Computing Tij element "on the fly"
+// (ec.21) Noguti & Go 1983 pp.3685-90
+// (T 6x6 matrix must be already allocated!)
+void calcTij( double **T, int *index, int num, twid *decint, float *coord )
+{
+	int k,l,ki,li,in,i,j,m,n;
+	double r_alpha[3];
+	double r_beta[3];
+	double v[6];
+	double d;
+
+	for(i=0; i<6; i++)
+		for(j=0; j<6; j++)
+			T[i][j] = 0.0; // T initialization
+
+	for(i=1; i < num; i++) // screens inter-unit contacts (k vs. l)
+	{
+		in = index[i];
+		k = decint[ in ].k;
+		l = decint[ in ].l;
+		ki = 3*k;
+		li = 3*l;
+
+		// k-atom position retrieval (alpha)
+		r_alpha[0] = coord[ki];
+		r_alpha[1] = coord[ki + 1];
+		r_alpha[2] = coord[ki + 2];
+
+		// l-atom position retrieval (beta)
+		r_beta[0] = coord[li];
+		r_beta[1] = coord[li + 1];
+		r_beta[2] = coord[li + 2];
+
+		// D-Matrix
+		v[0] = r_alpha[1] * r_beta[2] - r_alpha[2] * r_beta[1];
+		v[1] = r_alpha[2] * r_beta[0] - r_alpha[0] * r_beta[2];
+		v[2] = r_alpha[0] * r_beta[1] - r_alpha[1] * r_beta[0];
+		v[3] = r_alpha[0] - r_beta[0];
+		v[4] = r_alpha[1] - r_beta[1];
+		v[5] = r_alpha[2] - r_beta[2];
+		//d = decint[in].C / pow(decint[in].d,2);
+		d = decint[in].C / decint[in].d;
+
+		for(n=0;n<6;n++) // Diadic product
+			for(m=0;m<6;m++)
+				T[n][m] += d * v[n] * v[m]; // Storing S-matrix
+	}
+}
 
 
 int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hess_matrix, int size, int nco, int *neig)
@@ -3657,6 +6663,254 @@ int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hes
 
 	return info;
 }
+
+
+inline int diag_dggev(double *eigval, double *eigvect, double *mass_matrix, double *hess_matrix, int size, int nco, int *neig, double *alphar, double *alphai, double *beta, double *vr,  double *vl,  double *work)
+{
+	bool verb = false;
+
+	/* Lapack subroutine arguments */
+	char jobvl, jobvr;
+	int  info, lda, ldb, ldvl, ldvr, lwork, nesi, nsix, j, m, n, msi, nsi;
+
+	int sizex = size + nco;
+
+	/***************************************************/
+	/*                                                 */
+	/*  now solve the generalized eigenvalue problem   */
+	/*                                                 */
+	/*  hess_matrix * U  =  lambda * mass_matrix * U   */
+	/*                                                 */
+	/***************************************************/
+
+	/*
+	 * SUBROUTINE DGGEV( JOBVL, JOBVR, N, A, LDA, B, LDB, ALPHAR, ALPHAI,
+	     $                  BETA, VL, LDVL, VR, LDVR, WORK, LWORK, INFO )
+	 *
+	 * In principle, to call a Fortran routine
+	 * from C we have to transform the matrix
+	 * from row major order to column major order,
+	 * but since the matrices are symmetric,
+	 * this is not necessary.
+	 *
+	 *
+	 *  -- LAPACK driver routine (version 3.0) --
+	 *     Univ. of Tennessee, Univ. of California Berkeley, NAG Ltd.,
+	 *     Courant Institute, Argonne National Lab, and Rice University
+	 *     June 30, 1999
+	 *
+	 *     .. Scalar Arguments ..
+	      CHARACTER          JOBVL, JOBVR
+	      INTEGER            INFO, LDA, LDB, LDVL, LDVR, LWORK, N
+	 *     ..
+	 *     .. Array Arguments ..
+	      DOUBLE PRECISION   A( LDA, * ), ALPHAI( * ), ALPHAR( * ),
+	     $                   B( LDB, * ), BETA( * ), VL( LDVL, * ),
+	     $                   VR( LDVR, * ), WORK( * )
+	 *     ..
+	 *
+	 *  Purpose
+	 *  =======
+	 *
+	 *  DGGEV computes for a pair of N-by-N real nonsymmetric matrices (A,B)
+	 *  the generalized eigenvalues, and optionally, the left and/or right
+	 *  generalized eigenvectors.
+	 *
+	 *  A generalized eigenvalue for a pair of matrices (A,B) is a scalar
+	 *  lambda or a ratio alpha/beta = lambda, such that A - lambda*B is
+	 *  singular. It is usually represented as the pair (alpha,beta), as
+	 *  there is a reasonable interpretation for beta=0, and even for both
+	 *  being zero.
+	 *
+	 *  The right eigenvector v(j) corresponding to the eigenvalue lambda(j)
+	 *  of (A,B) satisfies
+	 *
+	 *                   A * v(j) = lambda(j) * B * v(j).
+	 *
+	 *  The left eigenvector u(j) corresponding to the eigenvalue lambda(j)
+	 *  of (A,B) satisfies
+	 *
+	 *                   u(j)**H * A  = lambda(j) * u(j)**H * B .
+	 *
+	 *  where u(j)**H is the conjugate-transpose of u(j).
+	 *
+	 *
+	 *  Arguments
+	 *  =========
+	 *
+	 *  JOBVL   (input) CHARACTER*1
+	 *          = 'N':  do not compute the left generalized eigenvectors;
+	 *          = 'V':  compute the left generalized eigenvectors.
+	 *
+	 *  JOBVR   (input) CHARACTER*1
+	 *          = 'N':  do not compute the right generalized eigenvectors;
+	 *          = 'V':  compute the right generalized eigenvectors.
+	 *
+	 *  N       (input) INTEGER
+	 *          The order of the matrices A, B, VL, and VR.  N >= 0.
+	 *
+	 *  A       (input/output) DOUBLE PRECISION array, dimension (LDA, N)
+	 *          On entry, the matrix A in the pair (A,B).
+	 *          On exit, A has been overwritten.
+	 *
+	 *  LDA     (input) INTEGER
+	 *          The leading dimension of A.  LDA >= max(1,N).
+	 *
+	 *  B       (input/output) DOUBLE PRECISION array, dimension (LDB, N)
+	 *          On entry, the matrix B in the pair (A,B).
+	 *          On exit, B has been overwritten.
+	 *
+	 *  LDB     (input) INTEGER
+	 *          The leading dimension of B.  LDB >= max(1,N).
+	 *
+	 *  ALPHAR  (output) DOUBLE PRECISION array, dimension (N)
+	 *  ALPHAI  (output) DOUBLE PRECISION array, dimension (N)
+	 *  BETA    (output) DOUBLE PRECISION array, dimension (N)
+	 *          On exit, (ALPHAR(j) + ALPHAI(j)*i)/BETA(j), j=1,...,N, will
+	 *          be the generalized eigenvalues.  If ALPHAI(j) is zero, then
+	 *          the j-th eigenvalue is real; if positive, then the j-th and
+	 *          (j+1)-st eigenvalues are a complex conjugate pair, with
+	 *          ALPHAI(j+1) negative.
+	 *
+	 *          Note: the quotients ALPHAR(j)/BETA(j) and ALPHAI(j)/BETA(j)
+	 *          may easily over- or underflow, and BETA(j) may even be zero.
+	 *          Thus, the user should avoid naively computing the ratio
+	 *          alpha/beta.  However, ALPHAR and ALPHAI will be always less
+	 *          than and usually comparable with norm(A) in magnitude, and
+	 *          BETA always less than and usually comparable with norm(B).
+	 *
+	 *  VL      (output) DOUBLE PRECISION array, dimension (LDVL,N)
+	 *          If JOBVL = 'V', the left eigenvectors u(j) are stored one
+	 *          after another in the columns of VL, in the same order as
+	 *          their eigenvalues. If the j-th eigenvalue is real, then
+	 *          u(j) = VL(:,j), the j-th column of VL. If the j-th and
+	 *          (j+1)-th eigenvalues form a complex conjugate pair, then
+	 *          u(j) = VL(:,j)+i*VL(:,j+1) and u(j+1) = VL(:,j)-i*VL(:,j+1).
+	 *          Each eigenvector will be scaled so the largest component have
+	 *          abs(real part)+abs(imag. part)=1.
+	 *          Not referenced if JOBVL = 'N'.
+	 *
+	 *  LDVL    (input) INTEGER
+	 *          The leading dimension of the matrix VL. LDVL >= 1, and
+	 *          if JOBVL = 'V', LDVL >= N.
+	 *
+	 *  VR      (output) DOUBLE PRECISION array, dimension (LDVR,N)
+	 *          If JOBVR = 'V', the right eigenvectors v(j) are stored one
+	 *          after another in the columns of VR, in the same order as
+	 *          their eigenvalues. If the j-th eigenvalue is real, then
+	 *          v(j) = VR(:,j), the j-th column of VR. If the j-th and
+	 *          (j+1)-th eigenvalues form a complex conjugate pair, then
+	 *          v(j) = VR(:,j)+i*VR(:,j+1) and v(j+1) = VR(:,j)-i*VR(:,j+1).
+	 *          Each eigenvector will be scaled so the largest component have
+	 *          abs(real part)+abs(imag. part)=1.
+	 *          Not referenced if JOBVR = 'N'.
+	 *
+	 *  LDVR    (input) INTEGER
+	 *          The leading dimension of the matrix VR. LDVR >= 1, and
+	 *          if JOBVR = 'V', LDVR >= N.
+	 *
+	 *  WORK    (workspace/output) DOUBLE PRECISION array, dimension (LWORK)
+	 *          On exit, if INFO = 0, WORK(1) returns the optimal LWORK.
+	 *
+	 *  LWORK   (input) INTEGER
+	 *          The dimension of the array WORK.  LWORK >= max(1,8*N).
+	 *          For good performance, LWORK must generally be larger.
+	 *
+	 *          If LWORK = -1, then a workspace query is assumed; the routine
+	 *          only calculates the optimal size of the WORK array, returns
+	 *          this value as the first entry of the WORK array, and no error
+	 *          message related to LWORK is issued by XERBLA.
+	 *
+	 *  INFO    (output) INTEGER
+	 *          = 0:  successful exit
+	 *          < 0:  if INFO = -i, the i-th argument had an illegal value.
+	 *          = 1,...,N:
+	 *                The QZ iteration failed.  No eigenvectors have been
+	 *                calculated, but ALPHAR(j), ALPHAI(j), and BETA(j)
+	 *                should be correct for j=INFO+1,...,N.
+	 *          > N:  =N+1: other than QZ iteration failed in DHGEQZ.
+	 *                =N+2: error return from DTGEVC.
+	 *
+	 *  =====================================================================
+	 */
+
+	jobvl='N';   /* do not compute left eigenvectors */
+
+	jobvr='V';   /* compute the right eigenvectors */
+
+	lda=sizex;
+	ldb=sizex;
+	ldvl=1;
+	ldvr=sizex;
+	lwork=20*sizex;
+
+
+	dggev_(&jobvl, &jobvr, &sizex, hess_matrix, &lda,
+			mass_matrix, &ldb, alphar, alphai, beta,
+			vl, &ldvl, vr, &ldvr, work, &lwork, &info);
+
+	// neig will contain the number of "useful" eigenvectors
+	*neig = 0;
+	for(n=0; n<sizex; n++)
+	{
+		if(verb>2)
+			fprintf(stdout,"ar= %.10e, ai= %.10e, b= %.10e\n",alphar[n], alphai[n], beta[n]);
+
+		if(beta[n]!=0.0 && alphai[n]==0.0) // alphai == 0 means NO imaginary eigenvalue
+		{
+			if(verb>2)
+				fprintf(stdout,"ar= %.10e, ai= %.10e, b= %.10e, lambda= %.10e\n",alphar[n], alphai[n], beta[n], alphar[n]/beta[n]);
+
+			eigval[*neig] = alphar[n] / beta[n];
+
+			//			fprintf(stderr,"Eigenvalue %d: %f, ",n,eigval[*neig]);
+			//			if(alphai[n]!=0.0)
+			//				fprintf(stderr,"alphai %2d is NOT Zero: %f",n,alphai[n]);
+
+			nesi = (*neig) * size;
+			nsix = n*sizex;
+			for(j=0; j<size; j++)
+				eigvect[nesi+j] = vr[nsix+j];
+
+			//			fprintf(stdout, "Full eigenvector dump:\n");
+			//			for(j=0; j<sizex; j++)
+			//				fprintf(stdout, " %8.2e", vr[nsix+j]);
+			//			fprintf(stdout, " \n");
+
+			(*neig)++;
+		}
+		//		else
+		//		{
+		//			// MON
+		//			if(beta[n]==0.0)
+		//				fprintf(stderr,"beta %2d is Zero: %f, ",n,beta[n]);
+		//			if(alphai[n]!=0.0)
+		//				fprintf(stderr,"alphai %2d is NOT Zero: %f",n,alphai[n]);
+		//			if(alphai[n]==0.0)
+		//				fprintf(stderr,"alphai %2d is Zero: %f and alphar is: %f",n,alphai[n],alphar[n]);
+		//		}
+		//		fprintf(stderr,"\n");
+	}
+
+	// sort by increasing eigenvalue
+	for(m=0;m<(*neig)-1;m++)
+	{
+		msi = m*size;
+		for(n=m+1;n<(*neig);n++)
+			if(eigval[m] > eigval[n])
+			{
+				SWAPPING(eigval[m], eigval[n], double);
+				nsi = n*size;
+				for(j=0;j<size;j++)
+					SWAPPING(eigvect[msi+j], eigvect[nsi+j], double);
+			}
+	}
+
+
+
+	return info;
+}
+
 
 
 //*  DSYGVX computes SELECTED eigenvalues, and optionally, eigenvectors
@@ -3995,7 +7249,7 @@ void show_vector(FILE *f, float *v, int size, char *name, char *fmt, bool newlin
 
 // Convert IC (dihedral) modes into Cartesian modes
 //	masses_sqrt --> Array of the square root of the atomic masses (one per loop atom)
-double *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, float *masses_sqrt)
+inline double *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, float *masses_sqrt)
 {
 
 	// Cartesian modes
@@ -4044,6 +7298,56 @@ double *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, float *
 	}
 
 	return Aop;
+}
+
+inline void  *ic2cart(double *eigvect, int nevec, trd *der, int size, int nla, double *Aop, float *masses_sqrt)
+{
+
+	// Cartesian modes
+	//double *Aop  = (double *) malloc( 3 * nla * nevec * sizeof(double));
+
+	// Compute the matrix of Cartesian normal modes
+	double v[3]; // some vector
+
+	if(masses_sqrt == NULL) // Not-weighted Cartesian eigenvectors
+	{
+		for(int i = 0; i < nevec;i++) // Screen computed modes
+		{
+			for(int kp=0; kp<nla; kp++) // screen atoms  // Mon added the +3, watch out!
+			{
+				v[0] = v[1] = v[2] = 0.0;
+				for(int j=0; j<size; j++) // screen variables
+				{
+					v[0] += der[kp*size + j].x * eigvect[i*size + j];
+					v[1] += der[kp*size + j].y * eigvect[i*size + j];
+					v[2] += der[kp*size + j].z * eigvect[i*size + j];
+				}
+				Aop[i * 3 * nla + 3*kp ] = v[0];
+				Aop[i * 3 * nla + 3*kp + 1] = v[1];
+				Aop[i * 3 * nla + 3*kp + 2] = v[2];
+			}
+		}
+	}
+	else
+	{
+		for(int i = 0; i < nevec;i++) // Screen computed modes
+		{
+			for(int kp=0; kp<nla; kp++) // screen atoms  // Mon added the +3, watch out!
+			{
+				v[0] = v[1] = v[2] = 0.0;
+				for(int j=0; j<size; j++) // screen variables
+				{
+					v[0] += der[kp*size + j].x * eigvect[i*size + j];
+					v[1] += der[kp*size + j].y * eigvect[i*size + j];
+					v[2] += der[kp*size + j].z * eigvect[i*size + j];
+				}
+				Aop[i * 3 * nla + 3*kp ]    =  masses_sqrt[kp] * v[0];
+				Aop[i * 3 * nla + 3*kp + 1] = masses_sqrt[kp] * v[1];
+				Aop[i * 3 * nla + 3*kp + 2] = masses_sqrt[kp] * v[2];
+			}
+		}
+	}
+
 }
 
 void move_loop_linear(pdbIter *iter, double *cevec, int imod, int ifpa, int nla)
@@ -4772,7 +8076,7 @@ float *get_masses(pdbIter *iter, int num_atoms)
 // Moves atoms given an Internal Coordinates Normal Mode and a Step
 // Simple Rotations Scheme (Fast & Multi-Chain/Prot/DNA/RNA/SMOL): 3BB2R & Full-Atom models
 // Ref.: Choi, "On Updating Torsion Angles of Molecular Conformations" (2006).
-void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu, int size, int model, float step)
+inline void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu, int size, int model, float step)
 {
 	bool debug = false;
 	int j,j2;
@@ -5056,7 +8360,10 @@ void move_loop_dihedral(pdbIter *iter, int ifr, int ilr, tri *props, double *uu,
 
 // Creates contacts list (IPA) for some loop (intra-loop + loop vs. environment) from two iterators pointing to the same Macromolecule.
 // (The "masses", i.e. occupancies, with zero mass will not be accounted for.)
-void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cutoff, twid **p_decint, int *p_nipa)
+// MON: This works!!! Either use it instead of the other, or modify it accordingly!
+// Creates contacts list (IPA) for some loop (intra-loop + loop vs. environment) from two iterators pointing to the same Macromolecule.
+// (The "masses", i.e. occupancies, with zero mass will not be accounted for.)
+inline void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cutoff, twid **p_decint, int *p_nipa)
 {
 	bool debug = false;
 	int nipa, index, k, l;
@@ -5072,6 +8379,78 @@ void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cut
 	// iterA = new pdbIter(mol);
 	// iterB = new pdbIter(mol);
 
+	// MON: Bug? (12/4/2022) --> WTF!!! OMG!!!
+	// decint = ( twid * ) realloc( decint,  nla*120 * sizeof( twid ) ); //  60 contacts per atom
+	decint = ( twid * ) malloc(  nla*500 * sizeof( twid ) ); //  60 contacts per atom
+
+	if(debug)
+		fprintf(stdout,"Msg(make_ipas_new): Creating Interacting Pairs of pseudo-Atoms (IPAs) list.\n");
+
+	for(iterA->pos_atom = ifpa; iterA->pos_atom < ifpa + nla; iterA->next_atom() )
+	{
+		atA = iterA->get_atom();
+		if(atA->getPdbocc() != 0.0) // if it's not a virtual atom (modified 24/11/2009)
+		{
+			atA->getPosition(rA);
+			//  for(iterB->pos_atom = iterA->pos_atom+1; !iterB->gend_atom(); iterB->next_atom() )
+			for(iterB->pos_atom = 0; !iterB->gend_atom(); iterB->next_atom() )
+			{
+				// MON: Bad Bug? (12/4/2022) --> following lines prevent considering k<l interactions (k=A, l=B)
+				// if(iterA->pos_atom >= iterB->pos_atom) // Avoids counting twice intra-loop contacts
+				// continue;
+
+				if(iterB->pos_atom >= ifpa && iterB->pos_atom < ifpa+nla && iterA->pos_atom >= iterB->pos_atom) // Avoids counting twice intra-loop contacts
+					continue;
+
+				atB = iterB->get_atom();
+				if(atB->getPdbocc() != 0.0)  // if it's not a virtual atom
+				{
+					atB->getPosition(rB);
+					// d2 = pow(rA[0]-rB[0],2) + pow(rA[1]-rB[1],2) + pow(rA[2]-rB[2],2);
+					// if (nipa> 400) printf ("nipa ???  %d %d\n", nipa, nla*500);
+
+					if( (d2 = pow(rA[0]-rB[0],2)) > cutoff2) continue;
+					else if((d2+= pow(rA[1]-rB[1],2)) > cutoff2)  continue;
+					else if((d2+= pow(rA[2]-rB[2],2)) <= cutoff2)
+					{
+						nipa++; // Counts number of Interacting Pairs of Atoms
+						// decint = ( twid * ) realloc( decint, nipa * sizeof( twid ) ); // resizes contact list-structure
+						decint[nipa - 1].k = iterA->pos_atom; // k-pseudo-atom index (i-atom index)
+						decint[nipa - 1].l = iterB->pos_atom; // l-pseudo-atom index (j-atom index)
+						decint[nipa - 1].d = d2; // sqrtf(d2); // set distance
+						decint[nipa - 1].C = 0.0; // force constant will be set in the future
+					}
+				}
+			}
+		}
+	}
+	//  delete iterA;
+	//  delete iterB;
+
+	if(debug)
+		printf( "Msg(make_ipas_loop): Number of Interacting Pairs of pseudo-Atoms (NIPAs): %d   %f per residue %d \n", nipa, 1.0*nipa/(nla), nla );
+
+	*p_nipa = nipa; // outputs "nipas"
+	*p_decint = decint;
+}
+
+inline void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cutoff, twid *decint, int *p_nipa)
+{
+	bool debug = false;
+	int nipa, index, k, l;
+	double d2;
+	float cutoff2;
+	cutoff2 = cutoff*cutoff; // to speed-up distance evaluations
+	//twid *decint;
+	//decint = *p_decint;
+	nipa = 0; // counts the number of interacting pseudo-atom pairs
+	Atom *atA,*atB;
+	Tcoor rA,rB;
+	// pdbIter *iterA,*iterB;
+	// iterA = new pdbIter(mol);
+	// iterB = new pdbIter(mol);
+	// decint = ( twid * ) realloc( decint, (ifpa + nla)*120 * sizeof( twid ) ); // resizes contact list-structure
+
 	if(debug)
 		fprintf(stdout,"Msg(make_ipas_new): Creating Interacting Pairs of pseudo-Atoms (IPAs) list.\n");
 
@@ -5084,22 +8463,30 @@ void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cut
 			//		  for(iterB->pos_atom = iterA->pos_atom+1; !iterB->gend_atom(); iterB->next_atom() )
 			for(iterB->pos_atom = 0; !iterB->gend_atom(); iterB->next_atom() )
 			{
-				if(iterA->pos_atom >= iterB->pos_atom) // Avoids counting twice intra-loop contacts
+
+
+				if(iterB->pos_atom >= ifpa && iterB->pos_atom < ifpa+nla && iterA->pos_atom >= iterB->pos_atom) // Avoids counting twice intra-loop contacts
 					continue;
 
 				atB = iterB->get_atom();
 				if(atB->getPdbocc() != 0.0)  // if it's not a virtual atom
 				{
 					atB->getPosition(rB);
-					d2 = pow(rA[0]-rB[0],2) + pow(rA[1]-rB[1],2) + pow(rA[2]-rB[2],2);
+					//d2 = pow(rA[0]-rB[0],2) + pow(rA[1]-rB[1],2) + pow(rA[2]-rB[2],2);
+					//if(d2 <= cutoff2)
 
-					if(d2 <= cutoff2)
+					if( (d2 = pow(rA[0]-rB[0],2)) > cutoff2) continue;
+					else if((d2+= pow(rA[1]-rB[1],2)) > cutoff2)  continue;
+					else if((d2+= pow(rA[2]-rB[2],2)) <= cutoff2)
 					{
 						nipa++; // Counts number of Interacting Pairs of Atoms
-						decint = ( twid * ) realloc( decint, nipa * sizeof( twid ) ); // resizes contact list-structure
+						// if (nipa> 500) printf ("nipa %d\n", nipa);
+						//if (d2<1.0) printf ("nipa %d %d %f\n",iterA->pos_atom,iterB->pos_atom, nipa);
+
+						// decint = ( twid * ) realloc( decint, nipa * sizeof( twid ) ); // resizes contact list-structure
 						decint[nipa - 1].k = iterA->pos_atom; // k-pseudo-atom index (i-atom index)
 						decint[nipa - 1].l = iterB->pos_atom; // l-pseudo-atom index (j-atom index)
-						decint[nipa - 1].d = sqrtf(d2); // set distance
+						decint[nipa - 1].d = d2; // sqrtf(d2); // set distance // ojo
 						decint[nipa - 1].C = 0.0; // force constant will be set in the future
 					}
 				}
@@ -5110,11 +8497,12 @@ void make_ipas_loop(pdbIter *iterA, pdbIter *iterB, int ifpa, int nla, float cut
 	//  delete iterB;
 
 	if(debug)
-		printf( "Msg(make_ipas_loop): Number of Interacting Pairs of pseudo-Atoms (NIPAs): %d\n", nipa );
+		printf( "Msg(make_ipas_loop): Number of Interacting Pairs of pseudo-Atoms (NIPAs): %d   %f per residue \n", nipa, 1.0*nipa/(ifpa + nla) );
+
 
 	*p_nipa = nipa; // outputs "nipas"
-	*p_decint = decint;
 }
+
 
 
 // Get the array of atomic masses for some loop from one macromolecule iterator that points to a Macromolecule.
@@ -5223,16 +8611,15 @@ void anchor_drift(pdbIter *iter, pdbIter *iter2, tri *props, int ilr, float *p_d
 //	chain --> (OPTIONAL) Chain-ID for output Multi-PDB
 //	update --> (OPTIONAL) if "true", the "refmode" will be updated by current most overlapping mode
 //	RETURN --> Number of non-null eigenpairs
-int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *props, float *masses, float *masses_loop, int ifa, int ifr, int ilr,
-		int na, int size, int nco, double maxang, float cutoff, int nsteps, double *eigval, double *eigvect, float rmsd_conv, pdbIter *iterini,
-		char *file_movie, float delta_rmsd, int *p_fi, char chain, bool update)
+inline int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *props, float *masses, float *masses_loop, int ifa, int ifr, int ilr,
+		int na, int size, int nco, double maxang, float cutoff, int nsteps, int max_loops_save, double *eigval, double *eigvect, float rmsd_conv, pdbIter *iterini,
+		char *file_movie, float delta_rmsd, int *p_fi, char chain,  bool update)
 {
 	bool debug = false; // dump debug info
 	float *coord;
-	twid *decint = NULL; // Contacts data structure
 	int nipa;
 	int neig; // Number of non-null eigenvectors
-	int ncomps = 3*(na+3); // Number of components (x,y,z for each atom of mobile loop + 3 Ct-anchor atoms)
+	int ncomps = 3*(na+3); // Number of Cartesian components (x,y,z for each atom of mobile loop + 3 Ct-anchor atoms)
 
 	double *alpha = (double *) malloc( (size+nco) * sizeof(double)); // Alpha overlaps array (allocate memory for the maximum possible)
 	double *delta = (double *) malloc( (size+nco) * sizeof(double)); // Delta overlaps array (allocate memory for the maximum possible)
@@ -5254,12 +8641,11 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 	// Store the modulus of reference mode "refmode"
 	double modref = vector_modulus( refmode, ncomps ); // Reference CC vector modulus
 
-	double *mass_matrix; // Kinetic energy matrix
-	double *hess_matrix; // Hessian matrix
 
 	// Create iterators for RMSD computations
 	pdbIter *itermol = new pdbIter( mol, true, true, true, true ); // Iterator to current (moving) macromolecule
 	pdbIter *itermol2 = new pdbIter( mol, true, true, true, true ); // Iterator to current (moving) macromolecule to speed up Elastic Network refresh
+	int num_atoms = itermol->num_atom();
 
 	if(eigval == NULL) // if not previously allocated
 		eigval = (double *) malloc( sizeof(double) * (size + nco) );
@@ -5269,6 +8655,441 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 
 	float rmsd; // Current RMSD
 	float last_rmsd = 0.0; // Last saved RMSD
+	mol->coordMatrix( &coord );
+
+	// Allocate derivatives
+	trd *der = (trd *) malloc( (na + 3) * size * sizeof(trd) );
+	ptr_check(der);
+
+	int sizex = size + nco;
+	double *mass_matrix; // kinetic energy matrix
+	mass_matrix = (double *) malloc(sizex*sizex * sizeof(double));
+	ptr_check(mass_matrix);
+
+	double *rdr = (double *) malloc(size * sizeof(double)); // Auxiliar array
+	ptr_check(rdr);
+
+	double *hess_matrix; // Bordered Hessian matrix
+	hess_matrix = (double *) malloc(sizex*sizex * sizeof(double));
+	ptr_check(hess_matrix);
+
+	double *cevec  = (double *) malloc( 3 * (na+3) * (size - nco) * sizeof(double));
+
+	//decint = ( twid * ) realloc( decint, (ifpa + nla)*12 * sizeof( twid ) ); // resizes contact list-structure
+
+	twid *decint = ( twid * ) malloc(   (na)*500 * sizeof( twid ) ); //  60 contacts per atom
+	ptr_check(decint);
+
+	double *alphar, *alphai, *beta, *vr,  *vl, *work;
+
+
+	alphar = (double *) malloc(sizex * sizeof(double));
+	ptr_check(alphar);
+
+	alphai = (double *) malloc(sizex * sizeof(double));
+	ptr_check(alphai);
+
+	beta = (double *) malloc(sizex * sizeof(double));
+	ptr_check(beta);
+
+	vl = (double *) malloc(1*sizex * sizeof(double));
+	ptr_check(vl);
+
+	vr = (double *) malloc(sizex*sizex * sizeof(double));   /* eigenvectors */
+	ptr_check(vr);
+
+	work = (double *) malloc(20*sizex * sizeof(double));
+	ptr_check(work);
+
+	float ddrift = 0.0; // Distance drift at Ct end
+	float adrift = 0.0; // Angle (bond angle) drift at Ct end
+	float adist = 0.0; // Anchor distance
+	float aang = 0.0; // Anchor angle
+	float adist0 = 0.0; // Initial anchor distance
+	float aang0 = 0.0; // Initial anchor angle
+
+    anchor_drift(iterini, itermol, props, ilr, &adist0, &aang0);
+
+    double rmsdL, rmsdP;
+    rmsdL=100.0;
+	for(int f = 0; f < nsteps; f++) // some maximum number of sampling steps
+	{
+
+		//if ( fabs(rmsdP-rmsdL) >= 0.02)
+		{
+		// Initialize Eigenvalues
+		memset(eigval, 0, (size+nco)*sizeof(double));
+
+
+		// Initialize Eigenvectors
+		memset(eigvect, 0, (size+nco)*size*sizeof(double));
+
+
+		// if(debug)
+		//	fprintf(stderr, "follow_mode> Getting coordinates single row (pseudo-atom model)\n");
+
+		update_loop_coords(itermol, props[ifr].k1, na, coord);
+
+		//if(debug)
+		//	fprintf(stderr, "follow_mode> Computing derivatives...\n");
+		//der = drdqC5x(coord, props, ifr, ilr, na, size, model);
+		drdqC5x(coord, props, ifr, ilr, na, size, model, der);
+
+
+		//if(debug)
+		//	fprintf(stderr, "follow_mode> Computing Kinetic Energy matrix (masses matrix)...\n");
+		//mass_matrix = kineticC5x(der, masses, props, ifr, na, size, nco);
+		kineticC5x(der, masses, props, ifr, na, size, nco, mass_matrix );
+
+
+		//		if(decint != NULL)
+		//			free(decint); // Free obsolete contacts list
+
+		// Allocate "decint" to store the contacts list (ipas-list)
+		//if( !(decint = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )  // Required for "realloc"
+		//{
+		//	fprintf(stderr, "Sorry, \"decint\" memory allocation failed!\n");
+		//	exit(1);
+		//}
+
+		//if(debug)
+		//	fprintf(stderr, "follow_mode> Computing Interacting Pair of (non-virtual) Atoms (ipas)\n");
+
+		// INVERSE EXPONENTIAL (power of distance for contact matrix)
+		// Making Interacting Pairs of (non-virtual) Atoms (ipas)
+
+	//if ( fabs(rmsdP-rmsdL) >= 0.02)
+				{
+		make_ipas_loop(itermol, itermol2, ifa, na, cutoff, decint, &nipa); // Updating Elastic network
+		// fprintf(stderr, "nipa %d\n", nipa);
+		//if(debug)
+		//	fprintf(stderr, "follow_mode> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", nipa, cutoff_k0, cte_k0, x0);
+		for(int i=0; i<nipa; i++)
+			decint[i].C = Inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
+		rmsdL= rmsdP;
+				}
+		// IPAs checking
+		//if(debug) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
+		//	for(int i=0; i<nipa; i++)
+		//		fprintf(stderr, "ipa %4d: k= %d  l= %d  d= %f  C= %f\n",i,decint[i].k,decint[i].l,decint[i].d,decint[i].C);
+
+		//if(debug)
+		//	fprintf(stderr, "follow_mode> Computing Hessian matrix (potential energy matrix)...\n");
+		//hessianC5x(coord, der, props, decint, nipa, ifr, na, size, nco, rdr, hess_matrix);
+		hessianFast(coord, coord, der, props, decint, nipa, ifr, ilr, size, nco, num_atoms, hess_matrix);
+
+		// free(decint); // free obsolete elastic network
+
+		//if(debug)
+		//{
+			// Show Hessian matrix
+		//	show_matrix(hess_matrix, size + nco, "Hessian:", " %7.2f");
+			// Show Kinetic Energy matrix
+		//	show_matrix(mass_matrix, size + nco, "Kinetic:", " %7.0f");
+		//}
+
+
+		// COMPUTING THE EIGENVECTORS AND EIGENVALUES
+		//int info = diag_dggev(eigval, eigvect, mass_matrix, hess_matrix, size, nco, &neig);
+		int info = diag_dggev(eigval, eigvect, mass_matrix, hess_matrix, size, nco, &neig, alphar, alphai, beta, vr,  vl, work);
+
+		//free(mass_matrix);
+		//free(hess_matrix);
+
+		// Some checking...
+		if( info ) // if info != 0
+		{
+			fprintf(stderr, "\nfollow_mode> An error occured in the matrix diagonalization: %d\n", info);
+			exit(1);
+		}
+
+		// MON: check this, seems unnecessary...
+		if(neig < nevec)
+		{
+			fprintf(stderr," Warning more eigenvectors requested (%d) than available (%d), forcing exit!\n",nevec,neig);
+		}
+
+//		if(debug)
+//		{
+//			fprintf(stderr, "follow_mode> Eigensolver successfully finished!!! (neig=%d)\n", neig);
+//			show_vector(stderr,eigval,neig,"Dumping Raw Eigenvalues:", " %5.2e");
+//			show_vectors(stderr,eigvect,size,neig,"Dumping Raw Eigenvectors:", " %5.2e");
+//		}
+
+		// Scale eigenvectors so that the maximum value of the components is "maxang"
+		if(maxang != 0.0)
+		{
+			scale_vectors(eigvect,size,neig,maxang * M_PI / 180.0);
+//			if(verb > 1)
+//				show_vectors(stderr,eigvect,size,neig,"Dumping Scaled Eigenvectors:", " %5.2e");
+		}
+
+		// Compute the Cartesian eigenvectors from the Internal Coordinates eigenvectors
+		// double *cevec; // Cartesian eigenvectors
+		// cevec = ic2cart(eigvect, neig, der, size, na + 3, masses_loop);
+		cevec = ic2cart(eigvect, neig, der, size, na + 3, masses_loop);
+
+		//
+
+	}
+		//else
+	//{
+		//fprintf(stdout,"jump\n");
+
+	//}
+
+
+		//		sprintf(text,"follow_mode> %4d ", f);
+//		if(verb > 0)
+//			fprintf(stdout,"follow_mode> %4d ", f);
+
+		// Compute "alpha": projecting "refmode" vector into "cevec" modal space to obtain "alpha" projection
+		for(int n=0; n<nevec; n++)
+			alpha[n] = dotprodnorm( refmode, cevec + n*ncomps, ncomps, modref );
+		// show_vector(stdout, alpha, nevec, "", " %7.4f", false, false);
+
+		// Compute "delta" array from "alpha" ("delta" array is the element-wise square of "alpha")
+		pow_vector(alpha, delta, nevec, 2);
+//		if(verb > 0)
+//			show_vector(stdout, delta, nevec, "", " %6.4f", false, false);
+
+		// Compute "delta" value
+//		if(verb > 0)
+//			fprintf(stdout, "  %7.5f", sqrt( sum_vector(delta, nevec) ));
+
+
+		// Using Alpha
+		for(int k = 0; k < size; k++)
+			mode[ k ] = 0.0; // reset
+		for(int n = 0; n < nevec; n++)
+			for(int k = 0; k < size; k++) // Mon added the +3, watch out!
+				mode[ k ] += eigvect[ n * size + k ] * alpha[n]; // Amplitude of n-th mode
+
+
+		// Generate trajectory (dihedral motion)
+		if(maxang != 0.0)
+			scale_vectors(mode, size, 1, fabs(maxang) * M_PI / 180.0); // Scale current merged mode
+
+		move_loop_dihedral(itermol, ifr, ilr, props, mode, size, model, 1.0);
+
+		// Does some loop atom clash with its environment?
+		//		sprintf(dummy, " %d", clashed_loop( itermol, itermol2, ifa, na, 1.0) );
+		//		strcat(text, dummy);
+
+		if(iterini != NULL)
+		{
+			anchor_drift(iterini, itermol, props, ilr, &adist, &aang);
+			ddrift = fabs(adist - adist0); // Distance increment wrt. initial distance
+			adrift = fabs(aang - aang0); // Angle increment wrt. initial angle
+
+			if (ddrift > 0.03 || adrift> 9)
+			{
+				    if(verb > 0)
+					fprintf(stdout,"follow_mode> Motion tends to overfit = %8f  %8f rmsd %8f \n", ddrift, adrift, rmsd);
+			        break;
+			}
+
+			rmsdP = rmsd;
+			rmsd = rmsd_loop(iterini, itermol, ifa, na);
+
+
+			//fprintf(stdout, " %7.4f %7.4f %7.4f %7.4f\n", rmsd, rmsdL, rmsdP, (rmsdL - rmsdP) );
+
+
+
+			if(verb > 0)
+				fprintf(stdout, " %7.4f\n", rmsd);
+			//			sprintf(dummy, " %7.4f", rmsd);
+			//			strcat(text, dummy);
+
+			// Convergence check
+			if(rmsd > rmsd_conv)
+			{
+				if(verb > 0) fprintf(stdout,"follow_mode> Motion convergence reached! dRMSD = %8f > %8f\n", rmsd, rmsd_conv);
+				mol->writeMloop(file_movie, (*p_fi)++, ifr-1, ilr+1, chain);
+				if ((*p_fi)>=max_loops_save && max_loops_save!=0) break;
+				// exit(0);
+				break;
+			}
+
+			// Write just the indicated loop (from the index of first residue "ifr" to index of last residue "lfr") into a Multi-PDB
+			if(delta_rmsd < rmsd - last_rmsd)
+			{
+				if(verb > 0)
+					fprintf(stdout,"%s> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", prog, rmsd - last_rmsd, delta_rmsd);
+				//if (ddrift < 0.05 and adrift < 9)
+				{
+				mol->writeMloop(file_movie, (*p_fi)++, ifr-1, ilr+1, chain);
+				last_rmsd = rmsd; // Keep last saved RMSD
+				if ((*p_fi)>=max_loops_save && max_loops_save!=0) break;
+
+				}
+			}
+
+
+
+			//			// Compute anchor drift
+			//			anchor_drift(iterini, itermol, props, ilr, &adist, &aang);
+			//			ddrift = adist - adist0; // Distance increment wrt. initial distance
+			//			adrift = aang - aang0; // Distance increment wrt. initial distance
+			//			sprintf(dummy, " %6.3f %5.2f", ddrift, adrift);
+			//			strcat(text, dummy);
+
+			// fprintf(stdout,"%s\n", text); // Dump all output for current frame
+			// rmsd_old = rmsd;
+		}
+
+		// Convergence test
+		//				if(!mr_switch && (rmsd - rmsd_old < rmsd_conv || clashed_loop( itermol, itermol2, ifa, na, 1.0)))
+
+
+		//		fprintf(stdout,"%s\n", text); // Dump all output for current frame
+		//		fprintf(stdout, "\n");
+
+		//	Update the "refmode" and "modref" with the current most overlapping mode
+		if(update)
+		{
+			//			int nmax = get_max_index(delta, nevec);
+
+			for(int i=0; i<ncomps; i++)
+				refmode[i] = 0.0; // reset "refmode"
+
+			// Update the reference mode "refmode"
+			for(int k=0; k<nevec; k++)
+			{
+				//				if(alpha[k] > 0) // same direction
+				//					for(int i=0; i<ncomps; i++)
+				//						refmode[i] += cevec[ k * ncomps + i ] * delta[k];
+				//				else // reversed direction
+				//					for(int i=0; i<ncomps; i++)
+				//						refmode[i] -= cevec[ k * ncomps + i ] * delta[k];
+
+				for(int i=0; i<ncomps; i++)
+					refmode[i] += cevec[ k * ncomps + i ] * alpha[k];
+
+			}
+
+			// Update the modulus of reference mode "refmode"
+			modref = vector_modulus( refmode, ncomps ); // Reference CC vector modulus
+		}
+
+	}
+
+	free(coord); // free obsolete raw coordinates
+	free(mode); // free mode
+	free(alpha);
+	free(delta);
+	free(mass_matrix);
+	free(der); // Free obsolete derivatives
+	free(hess_matrix);
+	free(rdr);
+	free(cevec); // free obsolete modes
+	free(decint); // free obsolete elastic network
+	free(work);
+	free(vr);
+	free(alphar);
+	free(alphai);
+	free(beta);
+	free(vl);
+
+	if(update)
+		free(refmode);
+
+	delete itermol;
+	delete itermol2;
+
+	return neig; // Return the number of non-null eigenpairs
+}
+
+inline int MC_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *props, float *masses, float *masses_loop, int ifa, int ifr, int ilr,
+		int na, int size, int nco, double maxang, float cutoff, int nsteps, double *eigval, double *eigvect, float rmsd_conv, pdbIter *iterini,
+		char *file_movie, float delta_rmsd, int *p_fi, char chain, bool update)
+{
+	bool debug = false; // dump debug info
+	float *coord;
+	int nipa;
+	int neig; // Number of non-null eigenvectors
+	int ncomps = 3*(na+3); // Number of Cartesian components (x,y,z for each atom of mobile loop + 3 Ct-anchor atoms)
+
+	double *alpha = (double *) malloc( (size+nco) * sizeof(double)); // Alpha overlaps array (allocate memory for the maximum possible)
+	double *delta = (double *) malloc( (size+nco) * sizeof(double)); // Delta overlaps array (allocate memory for the maximum possible)
+	double *mode = (double *) malloc( size * sizeof(double)); // Merged mode for motion
+
+	double *refmode;
+
+	//	Update the "refmode" and "modref" with the current most overlapping mode
+	if(update)
+	{
+		refmode = (double *) malloc( ncomps * sizeof(double)); // Allocate reference CC vector
+
+		for(int i=0; i<ncomps; i++)
+			refmode[i] = refmode0[i]; // Copy the reference mode "refmode0" into "refmode"
+	}
+	else
+		refmode = refmode0; // Use the initial "refmode0"
+
+	// Store the modulus of reference mode "refmode"
+	double modref = vector_modulus( refmode, ncomps ); // Reference CC vector modulus
+
+
+	// Create iterators for RMSD computations
+	pdbIter *itermol = new pdbIter( mol, true, true, true, true ); // Iterator to current (moving) macromolecule
+	pdbIter *itermol2 = new pdbIter( mol, true, true, true, true ); // Iterator to current (moving) macromolecule to speed up Elastic Network refresh
+	int num_atoms = itermol->num_atom();
+
+	if(eigval == NULL) // if not previously allocated
+		eigval = (double *) malloc( sizeof(double) * (size + nco) );
+
+	if(eigvect == NULL) // if not previously allocated
+		eigvect = (double *) malloc( sizeof(double) * (size + nco) * size );
+
+	float rmsd; // Current RMSD
+	float last_rmsd = 0.0; // Last saved RMSD
+	mol->coordMatrix( &coord );
+
+	// Allocate derivatives
+	trd *der = (trd *) malloc( (na + 3) * size * sizeof(trd) );
+	ptr_check(der);
+
+	int sizex = size + nco;
+	double *mass_matrix; // kinetic energy matrix
+	mass_matrix = (double *) malloc(sizex*sizex * sizeof(double));
+	ptr_check(mass_matrix);
+
+	double *rdr = (double *) malloc(size * sizeof(double)); // Auxiliar array
+	ptr_check(rdr);
+
+	double *hess_matrix; // Bordered Hessian matrix
+	hess_matrix = (double *) malloc(sizex*sizex * sizeof(double));
+	ptr_check(hess_matrix);
+
+	double *cevec  = (double *) malloc( 3 * (na+3) * (size - nco) * sizeof(double));
+
+	//decint = ( twid * ) realloc( decint, (ifpa + nla)*12 * sizeof( twid ) ); // resizes contact list-structure
+
+	twid *decint = ( twid * ) malloc(   (na)*500 * sizeof( twid ) ); //  60 contacts per atom
+	ptr_check(decint);
+
+	double *alphar, *alphai, *beta, *vr,  *vl, *work;
+
+
+	alphar = (double *) malloc(sizex * sizeof(double));
+	ptr_check(alphar);
+
+	alphai = (double *) malloc(sizex * sizeof(double));
+	ptr_check(alphai);
+
+	beta = (double *) malloc(sizex * sizeof(double));
+	ptr_check(beta);
+
+	vl = (double *) malloc(1*sizex * sizeof(double));
+	ptr_check(vl);
+
+	vr = (double *) malloc(sizex*sizex * sizeof(double));   /* eigenvectors */
+	ptr_check(vr);
+
+	work = (double *) malloc(20*sizex * sizeof(double));
+	ptr_check(work);
 
 	for(int f = 0; f < nsteps; f++) // some maximum number of sampling steps
 	{
@@ -5283,46 +9104,46 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		if(debug)
 			fprintf(stderr, "follow_mode> Getting coordinates single row (pseudo-atom model)\n");
 
-		if (f==0)
-			mol->coordMatrix( &coord );
-		else {   // just update coord instead initializes
+		update_loop_coords(itermol, props[ifr].k1, na, coord);
 
-			update_loop_coords(itermol, props[ifr].k1, na, coord);
-		}
-
-
-
-		trd *der; // Derivatives
 		if(debug)
 			fprintf(stderr, "follow_mode> Computing derivatives...\n");
-		der = drdqC5x(coord, props, ifr, ilr, na, size, model);
+		//der = drdqC5x(coord, props, ifr, ilr, na, size, model);
+		drdqC5x(coord, props, ifr, ilr, na, size, model, der);
+
 
 		if(debug)
 			fprintf(stderr, "follow_mode> Computing Kinetic Energy matrix (masses matrix)...\n");
-		mass_matrix = kineticC5x(der, masses, props, ifr, na, size, nco);
+		//mass_matrix = kineticC5x(der, masses, props, ifr, na, size, nco);
+		kineticC5x(der, masses, props, ifr, na, size, nco, mass_matrix );
+
 
 		//		if(decint != NULL)
 		//			free(decint); // Free obsolete contacts list
 
 		// Allocate "decint" to store the contacts list (ipas-list)
-		if( !(decint = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )  // Required for "realloc"
-		{
-			fprintf(stderr, "Sorry, \"decint\" memory allocation failed!\n");
-			exit(1);
-		}
+		//if( !(decint = ( twid * ) malloc( 1 * sizeof( twid ) ) ) )  // Required for "realloc"
+		//{
+		//	fprintf(stderr, "Sorry, \"decint\" memory allocation failed!\n");
+		//	exit(1);
+		//}
 
 		if(debug)
 			fprintf(stderr, "follow_mode> Computing Interacting Pair of (non-virtual) Atoms (ipas)\n");
 
 		// INVERSE EXPONENTIAL (power of distance for contact matrix)
 		// Making Interacting Pairs of (non-virtual) Atoms (ipas)
-		make_ipas_loop(itermol, itermol2, ifa, na, cutoff, &decint, &nipa); // Updating Elastic network
+		// make_ipas_loop(itermol, itermol2, ifa, na, cutoff, &decint, &nipa); // Updating Elastic network
+		make_ipas_loop(itermol, itermol2, ifa, na, cutoff, decint, &nipa); // Updating Elastic network
+
+		// fprintf(stderr, "nipa %d\n", nipa);
+
 
 		if(debug)
 			fprintf(stderr, "follow_mode> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", nipa, cutoff_k0, cte_k0, x0);
 
 		for(int i=0; i<nipa; i++)
-			decint[i].C = inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
+			decint[i].C = Inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
 
 		// IPAs checking
 		if(debug) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
@@ -5331,8 +9152,10 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 
 		if(debug)
 			fprintf(stderr, "follow_mode> Computing Hessian matrix (potential energy matrix)...\n");
-		hess_matrix = hessianC5x(coord, der, props, decint, nipa, ifr, na, size, nco);
-		free(decint); // free obsolete elastic network
+		hessianC5x(coord, der, props, decint, nipa, ifr, na, size, nco, rdr, hess_matrix);
+		//hessianFast(coord, coord, der, props, decint, nipa, ifr, ilr, size, nco, num_atoms, hess_matrix);
+
+		// free(decint); // free obsolete elastic network
 
 		if(debug)
 		{
@@ -5343,10 +9166,13 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			show_matrix(mass_matrix, size + nco, "Kinetic:", " %7.0f");
 		}
 
+
 		// COMPUTING THE EIGENVECTORS AND EIGENVALUES
-		int info = diag_dggev(eigval, eigvect, mass_matrix, hess_matrix, size, nco, &neig);
-		free(mass_matrix);
-		free(hess_matrix);
+		//int info = diag_dggev(eigval, eigvect, mass_matrix, hess_matrix, size, nco, &neig);
+		int info = diag_dggev(eigval, eigvect, mass_matrix, hess_matrix, size, nco, &neig, alphar, alphai, beta, vr,  vl, work);
+
+		//free(mass_matrix);
+		//free(hess_matrix);
 
 		// Some checking...
 		if( info ) // if info != 0
@@ -5377,9 +9203,9 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 		}
 
 		// Compute the Cartesian eigenvectors from the Internal Coordinates eigenvectors
-		double *cevec; // Cartesian eigenvectors
+		// double *cevec; // Cartesian eigenvectors
+		// cevec = ic2cart(eigvect, neig, der, size, na + 3, masses_loop);
 		cevec = ic2cart(eigvect, neig, der, size, na + 3, masses_loop);
-		free(der); // Free obsolete derivatives
 
 
 		//		sprintf(text,"follow_mode> %4d ", f);
@@ -5408,6 +9234,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			for(int k = 0; k < size; k++) // Mon added the +3, watch out!
 				mode[ k ] += eigvect[ n * size + k ] * alpha[n]; // Amplitude of n-th mode
 
+
 		// Generate trajectory (dihedral motion)
 		if(maxang != 0.0)
 			scale_vectors(mode, size, 1, fabs(maxang) * M_PI / 180.0); // Scale current merged mode
@@ -5429,7 +9256,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			// Convergence check
 			if(rmsd > rmsd_conv)
 			{
-				fprintf(stdout,"follow_mode> Motion convergence reached! dRMSD = %8f > %8f\n", rmsd, rmsd_conv);
+				if(verb > 0) fprintf(stdout,"follow_mode> Motion convergence reached! dRMSD = %8f > %8f\n", rmsd, rmsd_conv);
 				mol->writeMloop(file_movie, (*p_fi)++, ifr-1, ilr+1, chain);
 				// exit(0);
 				break;
@@ -5439,7 +9266,7 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			if(delta_rmsd < rmsd - last_rmsd)
 			{
 				if(verb > 0)
-					fprintf(stdout,"%d> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", prog, rmsd - last_rmsd, delta_rmsd);
+					fprintf(stdout,"%s> Structure dumped into Muli-PDB dRMSD = %8f > %8f\n", prog, rmsd - last_rmsd, delta_rmsd);
 				mol->writeMloop(file_movie, (*p_fi)++, ifr-1, ilr+1, chain);
 				last_rmsd = rmsd; // Keep last saved RMSD
 			}
@@ -5489,13 +9316,24 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 			modref = vector_modulus( refmode, ncomps ); // Reference CC vector modulus
 		}
 
-		free(cevec); // free obsolete modes
 	}
 
 	free(coord); // free obsolete raw coordinates
 	free(mode); // free mode
 	free(alpha);
 	free(delta);
+	free(mass_matrix);
+	free(der); // Free obsolete derivatives
+	free(hess_matrix);
+	free(rdr);
+	free(cevec); // free obsolete modes
+	free(decint); // free obsolete elastic network
+	free(work);
+	free(vr);
+	free(alphar);
+	free(alphai);
+	free(beta);
+	free(vl);
 
 	if(update)
 		free(refmode);
@@ -5505,8 +9343,6 @@ int follow_mode(double *refmode0, Macromolecule *mol, int model, int type, tri *
 
 	return neig; // Return the number of non-null eigenpairs
 }
-
-
 // Loop NMA routine to just compute the eigenvectors/values given some macromolecular loop
 //	mol --> Input macromolecule
 //	model --> Atomic model
@@ -5557,9 +9393,9 @@ int nma_loop(Macromolecule *mol, int model, int type, tri *props, float *masses,
 	mol->coordMatrix( &coord );
 
 	trd *der; // Derivatives
-	if(debug)
+	if(debug) {
 		fprintf(stdout, "%s> Computing derivatives...\n", prog);
-	fprintf(stderr, "%s> ifr= %d  ilr= %d  na= %d  size= %d  model= %d\n", prog, ifr, ilr, na, size, model);
+	}
 	der = drdqC5x(coord, props, ifr, ilr, na, size, model); // Derivatives
 
 	if(debug)
@@ -5578,7 +9414,7 @@ int nma_loop(Macromolecule *mol, int model, int type, tri *props, float *masses,
 	make_ipas_loop(itermol, itermol2, ifa, na, cutoff, &decint, &nipa); // Updating Elastic network
 	// fprintf( stdout, "%s> Inverse Exponential (%d nipas) cutoff= %.1f, k= %f, x0= %.1f ", prog, nipa, cutoff_k0, cte_k0, x0);
 	for(int i=0; i<nipa; i++)
-		decint[i].C = inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
+		decint[i].C = Inv_exp( cte_k0, decint[i].d, x0, power); // setting Force Constants
 
 	// IPAs checking
 	if(debug) // If Hessian and Kinetic energy matrices calculation and diagonalization are enabled.
@@ -5654,6 +9490,7 @@ void get_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord)
 		coord[i*3]     = pos[0];
 		coord[i*3 + 1] = pos[1];
 		coord[i*3 + 2] = pos[2];
+		//fprintf(stdout,"%f %f %f\n",pos[0],pos[1],pos[2]);
 
 		i++; // loop atom local index
 	}
@@ -5662,7 +9499,7 @@ void get_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord)
 
 
 
-void update_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord)
+inline void update_loop_coords(pdbIter *iter, int ifpa, int nla, float *coord)
 {
 	Tcoor pos;
 	int i = 0;
@@ -5808,3 +9645,4 @@ int get_max_index(double *v, int n)
 
 	return imax;
 }
+

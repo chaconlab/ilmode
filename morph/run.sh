@@ -5,11 +5,11 @@ prog="ilmode"
 ntoff=0  # N-terminal offset from "start" residue in input file
 ctoff=0  # C-terminal offset from "end" residue in input file
 
-suff="_aF0"  # general output suffix
-opts="-m 2 --skip_missingatoms -a 1 --drmsd 0.25"
+#suff="_aF0"  # general output suffix
+#opts="-m 2 --skip_missingatoms -a 1 --drmsd 0.25"
 
-#suff="_aF0x"  # general output suffix
-#opts="-m 2 -x --skip_missingatoms -a 1 --drmsd 0.25"
+suff="_aF0x"  # general output suffix
+opts="-m 2 -x --skip_missingatoms -a 1 --drmsd 0.25"
 
 #suff="_af0"  # general output suffix
 #opts="-m 3 --skip_missingatoms -a 1 --drmsd 0.25"

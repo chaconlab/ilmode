@@ -12,7 +12,7 @@
 				</extensions>
 			</storageModule>
 			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release" description="" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator;org.eclipse.cdt.core.ICCErrorParser" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070" name="Release_intel" optionalBuildProperties="" parent="intel.config.composerxe.exe.release" postannouncebuildStep="" postbuildStep="" preannouncebuildStep="" prebuildStep="">
+				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release" description="" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator;org.eclipse.cdt.core.ICCErrorParser" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070" name="Release_intel" optionalBuildProperties="org.eclipse.cdt.docker.launcher.containerbuild.property.selectedvolumes=,org.eclipse.cdt.docker.launcher.containerbuild.property.volumes=" parent="intel.config.composerxe.exe.release" postannouncebuildStep="" postbuildStep="" preannouncebuildStep="" prebuildStep="">
 					<folderInfo id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070." name="/" resourcePath="">
 						<toolChain errorParsers="org.eclipse.cdt.core.ICCErrorParser" id="intel.toolchain.composerxe.exe.release.1627187155" name="Intel(R) C++ Compiler XE" superClass="intel.toolchain.composerxe.exe.release">
 							<targetPlatform binaryParser="org.eclipse.cdt.core.ELF" id="intel.platform.composerxe.base.143873093" isAbstract="false" name="intel.platform.base" superClass="intel.platform.composerxe.base"/>
@@ -25,7 +25,16 @@
 									<listOptionValue builtIn="false" value="../../../src"/>
 								</option>
 								<option id="intel.compilestep.optimization.inline.expand1.432962423" name="Inline Function Expansion" superClass="intel.compilestep.optimization.inline.expand1" value="inl.exp1.anysuitable" valueType="enumerated"/>
-								<option id="intel.compilestep.perflibs.mkl.1438921033" name="Use Intel(R) Math Kernel Library (-mkl=[arg])" superClass="intel.compilestep.perflibs.mkl" value="perflibs.mkl.parallel" valueType="enumerated"/>
+								<option id="intel.compilestep.perflibs.mkl.1438921033" name="Use Intel(R) Math Kernel Library (-mkl=[arg])" superClass="intel.compilestep.perflibs.mkl" useByScannerDiscovery="false" value="perflibs.mkl.parallel" valueType="enumerated"/>
+								<option id="intel.compilestep.debug.parallel.1889830929" name="Enable Parallel Debug Checks (-debug parallel)" superClass="intel.compilestep.debug.parallel" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+								<option id="intel.compilestep.coptions.607788650" name="Additional Options" superClass="intel.compilestep.coptions" useByScannerDiscovery="false" value="" valueType="string"/>
+								<option id="intel.compilestep.optimization.fp.1045845348" name="Provide Frame Pointers (-fno-omit-frame-pointer)" superClass="intel.compilestep.optimization.fp" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+								<option id="intel.compilestep.optimization.ipo.844395992" name="Enable Whole Program Optimization (-ipo)" superClass="intel.compilestep.optimization.ipo" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+								<option id="intel.compilestep.optimization.ip.deprecated.137064974" name="Enable Interprocedural Optimization for Single File Compilation (-ip)" superClass="intel.compilestep.optimization.ip.deprecated" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+								<option id="intel.compilestep.optimization.parallel.1461511595" name="Parallelization (-parallel)" superClass="intel.compilestep.optimization.parallel" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+								<option id="intel.compilestep.perflibs.tbb.642531013" name="Use Intel(R) Threading Building Blocks Library (-tbb)" superClass="intel.compilestep.perflibs.tbb" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+								<option id="intel.compilestep.optimization.no.intrin.inline.784794339" name="Disable Intrinsic Inline Expansion (-nolib-inline)" superClass="intel.compilestep.optimization.no.intrin.inline" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+								<option id="intel.compilestep.optimization.fp_leaf.1983369072" name="Omit frame pointer for leaf routines (-momit-leaf-frame-pointer)" superClass="intel.compilestep.optimization.fp_leaf" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 								<inputType id="intel.cpp.compilestep.input.1813759831" name="C Sources" superClass="intel.cpp.compilestep.input"/>
 								<inputType id="intel.cpp.compilestep.asm.primary.1478042185" superClass="intel.cpp.compilestep.asm.primary"/>
 								<inputType id="intel.cpp.compilestep.asm.247812895" superClass="intel.cpp.compilestep.asm"/>
@@ -50,6 +59,7 @@
 								</option>
 								<option id="intel.linkstep.perflibs.mkl.1730207881" name="Use Intel(R) Math Kernel Library (-mkl=[arg])" superClass="intel.linkstep.perflibs.mkl" value="perflibs.mkl.parallel" valueType="enumerated"/>
 								<option id="intel.linkstep.general.optimization2.2009137714" name="Optimization Level" superClass="intel.linkstep.general.optimization2" value="general.opt.speedHLO" valueType="enumerated"/>
+								<option id="intel.linkstep.parallel.1247343277" name="Parallelization (-parallel)" superClass="intel.linkstep.parallel" value="false" valueType="boolean"/>
 								<inputType id="intel.linkstep.input.256540606" superClass="intel.linkstep.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -136,6 +146,8 @@
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Release_gcc"/>
+		<configuration configurationName="Release_intel"/>
 		<configuration configurationName="Debug">
 			<resource resourceType="PROJECT" workspacePath="/ilmode"/>
 		</configuration>
