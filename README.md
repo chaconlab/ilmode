@@ -39,9 +39,9 @@ Alternatively to a single mode motion, you can move in the direcction defined by
 ../scripts/renum_tr.pl 3hsz_allF_traj.pdb 3hsz_allB_traj.pdb > 3hsz_all.pdb
 </pre>
 
-Also with option -s 2 can move mutiple times (-np times) in different random modal directions. For example to obtain only 10 conformations at 1.0Å apart from the original loop conformation use:   
+Also with option -s 2 can move mutiple times (-nr times) in different random modal directions. For example to obtain only 10 conformations at 1.0Å apart from the original loop conformation use:   
 <pre>
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 1.0  --np 10 
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 1.0  --nr 10 
 </pre>
 and you can do it at different Rmsd cutoffs, i.e,  1.0Å , 3.0Å , and,  6.0Å:  
 
@@ -51,7 +51,7 @@ and you can do it at different Rmsd cutoffs, i.e,  1.0Å , 3.0Å , and,  6.0�
 
 finally, you can have in the trajectory file all the intermediate conformations by adding --drmsd <float> option.
 
-../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 3.0 --drmsd 0.25 --np 10 
+../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _multiple -m 2 -s 2 -a -1  --rmsd 3.0 --drmsd 0.25 --nr 10 
 
 <img src="images/rmsd3b.jpg" alt="alt text" width="320">
 
@@ -60,10 +60,10 @@ Finally, there is not restricition in where to put the restraints and you can mo
 <pre>
 ../sbg/bin/ilmode 4ake.pdb  109 162 --chain A -i 1 -o _mod1HF -m 2  -a  2  --rmsd 3.0 --drmsd 0.25  --seed 399495214
 ../sbg/bin/ilmode 4ake.pdb  109 162 --chain A -i 1 -o _mod1HB -m 2  -a -2  --rmsd 3.0 --drmsd 0.25  --seed 399495214
-../ilmode/scripts/renum_tr.pl 4ake_mod1HF_traj.pdb 4ake_mod1HB_traj.pdb >  4ake_mod1H.pdb
+../scripts/renum_tr.pl 4ake_mod1HF_traj.pdb 4ake_mod1HB_traj.pdb >  4ake_mod1H.pdb
 </pre>
 
-<video    src="https://user-images.githubusercontent.com/19269061/146780609-61c13d3d-aae1-48f7-b414-11745a0cd71b.mp4" autoplay="true" loop="true" controls="controls" >
+<video    src="https://user-images.githubusercontent.com/19269061/174634120-5b46a68c-f27e-42dc-aeba-e95229addcc6.mp4" autoplay="true" loop="true" controls="controls" >
 </video>
 
 
