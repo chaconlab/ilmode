@@ -1,7 +1,7 @@
 # ilmode
 
-Moving closed-loops with Normal Mode Analysis with constraints in internal coordinates. Local normal mode analysis for fast loop conformational sampling
-J.R. López-Blanco1, Y. Dehouck, U. Bastolla, and P. Chacón. (submitted) 
+Moving closed-loops with Normal Mode Analysis with constraints in internal coordinates. 
+Local normal mode analysis for fast loop conformational sampling. [J.R. López-Blanco1, Y. Dehouck, U. Bastolla, and P. Chacón. J. Chem. Inf. Model. 2022, 62, 18, 4561–4568](https://pubs.acs.org/doi/10.1021/acs.jcim.2c00870) 
 
  
 ### Sampling #### 
