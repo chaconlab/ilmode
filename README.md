@@ -18,7 +18,7 @@ The first command moves forward (-a 1) the 81-93 loop until the rmsd from the in
   </video>
 
 Note how the loop closure is fully maintained despite the large motion. Please, activate the loop option for a better display (right-click on the play icon). 
-Here there is another example with a different loop in where we compute all the modes:
+Here there is another example with a different loop in which we compute all the modes:
 
 <pre>
 for ((i=1;i<=17;i++)); 
@@ -33,7 +33,7 @@ done
  <video  width="320px" height="175px"  src="https://user-images.githubusercontent.com/19269061/141282242-ac69849d-3ceb-4241-8f11-fcdb0ab5c0a4.mp4" autoplay="true" loop="true" controls="controls" >
   </video>
 
-Alternatively to a single mode motion, you can move in the direcction defined by a random contribution of all the modes (option -s 1):   
+Alternatively, to a single mode motion, you can move in the direction defined by a random contribution of all the modes (option -s 1):   
 <pre>
 ../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _allF -m 2 -s 1 -a  1  --rmsd 3.0 --drmsd 0.25 
 ../sbg/bin/ilmode 3hsz.pdb  81 93 --chain A -i 1 -o _allB -m 2 -s 1 -a -1  --rmsd 3.0 --drmsd 0.25
@@ -57,7 +57,7 @@ finally, you can have in the trajectory file all the intermediate conformations 
 <img src="images/rmsd3b.jpg" alt="alt text" width="320">
 
 
-Finally, there is not restricition in where to put the restraints and you can move any segment of the protein. Here we move sub-domain of the adenilate kinase protein using:
+Finally, there is no restriction in where to put the restraints and you can move any segment of the protein. Here we move the sub-domain of the adenylate kinase protein using:
 <pre>
 ../sbg/bin/ilmode 4ake.pdb  109 162 --chain A -i 1 -o _mod1HF -m 2  -a  2  --rmsd 3.0 --drmsd 0.25  --seed 399495214
 ../sbg/bin/ilmode 4ake.pdb  109 162 --chain A -i 1 -o _mod1HB -m 2  -a -2  --rmsd 3.0 --drmsd 0.25  --seed 399495214
@@ -80,7 +80,7 @@ Initial rmsd=13.0Å             | Trajectory               | Final   rmsd=1.0�
 :-------------------------:|:-------------------------:|:-------------------------:
 ![](images/morphI.jpg)  | <video  width="320px" height="175px"  src="https://user-images.githubusercontent.com/19269061/141989128-c48c87b2-0a15-47b2-a560-0dbf5a3ee96e.mp4" autoplay="true" loop="true" controls="controls" > </video> |  ![](images/morphF.jpg)  
 
-Despite the only dihedral angles being moved we practically have reached the target structure. This and other examples illustrates the potential of this reduced loop-closed modal space for the conformational search. Here you can find another example:  
+We have reached the target structure despite the only dihedral angles being moved. This and other examples illustrate the potential of this reduced loop-closed modal space for the conformational search. Here you can find another example:  
 
 <pre>
 ilmode 3irs.pdb  66 76 --chain C -t 3k4w.pdb -m 2 -a 1 --drmsd 0.25 -x  -o  _morph
@@ -93,9 +93,9 @@ ilmode 3irs.pdb  66 76 --chain C -t 3k4w.pdb -m 2 -a 1 --drmsd 0.25 -x  -o  _mor
 
 * [sbg/](sbg/)  Source code and linux binaries 
 
-* [morph/](morph/) Highly variable loops benchmark observed in multiple stable conformations and compiled by Marks, C., et al. Sphinx: Merging knowledge-based and ab initio approaches to improve protein loop prediction. Bioinformatics 2017;33(9):1346-1353. This set includes 30 loops from 10 to 15 residues long. Each loop case is associated with an ensemble from 2 to 11 differ-ent conformations. 
+* [morph/](morph/) Highly variable loops benchmark observed in multiple stable conformations and compiled by Marks, C., et al. Sphinx: Merging knowledge-based and ab initio approaches to improve protein loop prediction. Bioinformatics 2017;33(9):1346-1353. This set includes 30 loops from 10 to 15 residues long. Each loop case is associated with an ensemble from 2 to 11 different conformations. 
 
-* [REMD/](REMD) Benchmark set of 15 exposed and diverse loops employed to test loop predictions using Replica Exchange Molecular simulations (REMD) with RSFF2C force field (Feng, J.J., et al. Accurate Structure Prediction for Protein Loops Based on Molecular Dynamics Simulations with RSFF2C. J Chem Theory Comput 2021;17(7):4614-4628). These loops had a resolution of <2.0 Å, Rfactor < 0.3, sequence identity <20% and an average B-factor <35. We extend the length of the loops one residue at the both ends to minimize the deviations of the anchors found in the REMD simulations. The length of the loops ranges from 12 to 18 residues. The initial MD structures were prepared via implicit MD simulations at high temperatures to guarantee to be far away from the crystallographic ones (>10 Å). Trajectories (last micro second) and initial REMD structures and the corresponding simulations were kindly provided by the authors, with structures already superimposed by the anchors.
+* [REMD/](REMD) Benchmark set of 15 exposed and diverse loops employed to test loop predictions using Replica Exchange Molecular simulations (REMD) with RSFF2C force field (Feng, J.J., et al. Accurate Structure Prediction for Protein Loops Based on Molecular Dynamics Simulations with RSFF2C. J Chem Theory Comput 2021;17(7):4614-4628). These loops had a resolution of <2.0 Å, Rfactor < 0.3, sequence identity <20%, and an average B-factor <35. We extend the length of the loop one residue at both ends to minimize the deviations of the anchors found in the REMD simulations. The size of the loops ranges from 12 to 18 residues. The initial MD structures were prepared via implicit MD simulations at high temperatures to guarantee to be far away from the crystallographic ones (>10 Å). Trajectories (last microsecond), initial REMD structures, and the corresponding simulations were kindly provided by the authors, with structures already superimposed by the anchors.
 
 ## Funding
 This work was supported by Spanish grants PID2019-109041GB-C21/AEI/10.13039/501100011033 
