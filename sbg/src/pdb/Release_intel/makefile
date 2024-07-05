@@ -52,7 +52,7 @@ all: ../../../bin/pdb
 ../../../bin/pdb: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Intel C++ Linker'
-	icpc -L../../../lib -O3 -o "../../../bin/pdb" $(OBJS) $(USER_OBJS) $(LIBS)
+	icpx -L../../../lib -O3 -o "../../../bin/pdb" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

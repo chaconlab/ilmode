@@ -1,159 +1,316 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?fileVersion 4.0.0?><cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
-	<storageModule moduleId="org.eclipse.cdt.core.settings">
-		<cconfiguration id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070">
-			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070" moduleId="org.eclipse.cdt.core.settings" name="Release_intel">
-				<externalSettings/>
-				<extensions>
-					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
-					<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.ICCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-				</extensions>
-			</storageModule>
-			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release" description="" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator;org.eclipse.cdt.core.ICCErrorParser" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070" name="Release_intel" optionalBuildProperties="org.eclipse.cdt.docker.launcher.containerbuild.property.selectedvolumes=,org.eclipse.cdt.docker.launcher.containerbuild.property.volumes=" parent="intel.config.composerxe.exe.release" postannouncebuildStep="" postbuildStep="" preannouncebuildStep="" prebuildStep="">
-					<folderInfo id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070." name="/" resourcePath="">
-						<toolChain errorParsers="org.eclipse.cdt.core.ICCErrorParser" id="intel.toolchain.composerxe.exe.release.1627187155" name="Intel(R) C++ Compiler XE" superClass="intel.toolchain.composerxe.exe.release">
-							<targetPlatform binaryParser="org.eclipse.cdt.core.ELF" id="intel.platform.composerxe.base.143873093" isAbstract="false" name="intel.platform.base" superClass="intel.platform.composerxe.base"/>
-							<builder buildPath="${workspace_loc:/ilmode}/Release" enableAutoBuild="true" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator" id="intel.builder.composerxe.makebuilder.358077950" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="intel.builder.composerxe.makebuilder"/>
-							<tool id="intel.tool.archiver.composerxe.base.1034808966" name="Intel Archiver" superClass="intel.tool.archiver.composerxe.base"/>
-							<tool command="icpc" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.ICCErrorParser" id="intel.tool.cpp.compiler.composerxe.base.1005405361" name="Intel C++ Compiler" superClass="intel.tool.cpp.compiler.composerxe.base">
-								<option defaultValue="false" id="intel.compilestep.general.debug.1721299502" name="Include Debug Information (-g)" superClass="intel.compilestep.general.debug" value="true" valueType="boolean"/>
-								<option defaultValue="general.opt.speed" id="intel.compilestep.general.optimization2.2027257000" name="Optimization Level" superClass="intel.compilestep.general.optimization2" value="general.opt.speedHLO" valueType="enumerated"/>
-								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="intel.compilestep.preprocessor.includedirectories.1151641873" name="Additional Include Directories (-I)" superClass="intel.compilestep.preprocessor.includedirectories" valueType="includePath">
-									<listOptionValue builtIn="false" value="../../../src"/>
-								</option>
-								<option id="intel.compilestep.optimization.inline.expand1.432962423" name="Inline Function Expansion" superClass="intel.compilestep.optimization.inline.expand1" value="inl.exp1.anysuitable" valueType="enumerated"/>
-								<option id="intel.compilestep.perflibs.mkl.1438921033" name="Use Intel(R) Math Kernel Library (-mkl=[arg])" superClass="intel.compilestep.perflibs.mkl" useByScannerDiscovery="false" value="perflibs.mkl.parallel" valueType="enumerated"/>
-								<option id="intel.compilestep.debug.parallel.1889830929" name="Enable Parallel Debug Checks (-debug parallel)" superClass="intel.compilestep.debug.parallel" useByScannerDiscovery="false" value="false" valueType="boolean"/>
-								<option id="intel.compilestep.coptions.607788650" name="Additional Options" superClass="intel.compilestep.coptions" useByScannerDiscovery="false" value="" valueType="string"/>
-								<option id="intel.compilestep.optimization.fp.1045845348" name="Provide Frame Pointers (-fno-omit-frame-pointer)" superClass="intel.compilestep.optimization.fp" useByScannerDiscovery="false" value="true" valueType="boolean"/>
-								<option id="intel.compilestep.optimization.ipo.844395992" name="Enable Whole Program Optimization (-ipo)" superClass="intel.compilestep.optimization.ipo" useByScannerDiscovery="false" value="true" valueType="boolean"/>
-								<option id="intel.compilestep.optimization.ip.deprecated.137064974" name="Enable Interprocedural Optimization for Single File Compilation (-ip)" superClass="intel.compilestep.optimization.ip.deprecated" useByScannerDiscovery="false" value="false" valueType="boolean"/>
-								<option id="intel.compilestep.optimization.parallel.1461511595" name="Parallelization (-parallel)" superClass="intel.compilestep.optimization.parallel" useByScannerDiscovery="false" value="false" valueType="boolean"/>
-								<option id="intel.compilestep.perflibs.tbb.642531013" name="Use Intel(R) Threading Building Blocks Library (-tbb)" superClass="intel.compilestep.perflibs.tbb" useByScannerDiscovery="false" value="false" valueType="boolean"/>
-								<option id="intel.compilestep.optimization.no.intrin.inline.784794339" name="Disable Intrinsic Inline Expansion (-nolib-inline)" superClass="intel.compilestep.optimization.no.intrin.inline" useByScannerDiscovery="false" value="false" valueType="boolean"/>
-								<option id="intel.compilestep.optimization.fp_leaf.1983369072" name="Omit frame pointer for leaf routines (-momit-leaf-frame-pointer)" superClass="intel.compilestep.optimization.fp_leaf" useByScannerDiscovery="false" value="true" valueType="boolean"/>
-								<inputType id="intel.cpp.compilestep.input.1813759831" name="C Sources" superClass="intel.cpp.compilestep.input"/>
-								<inputType id="intel.cpp.compilestep.asm.primary.1478042185" superClass="intel.cpp.compilestep.asm.primary"/>
-								<inputType id="intel.cpp.compilestep.asm.247812895" superClass="intel.cpp.compilestep.asm"/>
-							</tool>
-							<tool command="icc" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.ICCErrorParser" id="intel.tool.c.compiler.composerxe.base.996054199" name="Intel C Compiler" superClass="intel.tool.c.compiler.composerxe.base">
-								<option defaultValue="false" id="intel.compilestep.general.debug.1302680299" name="Include Debug Information (-g)" superClass="intel.compilestep.general.debug" valueType="boolean"/>
-								<option defaultValue="general.opt.speed" id="intel.compilestep.general.optimization2.2127210813" name="Optimization Level" superClass="intel.compilestep.general.optimization2" valueType="enumerated"/>
-								<inputType id="intel.c.compilestep.input.1787011622" name="C Sources" superClass="intel.c.compilestep.input"/>
-								<inputType id="intel.c.compilestep.asm.primary.725180964" superClass="intel.c.compilestep.asm.primary"/>
-								<inputType id="intel.c.compilestep.asm.1012992408" superClass="intel.c.compilestep.asm"/>
-							</tool>
-							<tool command="icpc" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.ICCErrorParser" id="intel.tool.cpp.linker.composerxe.base.505047108" name="Intel C++ Linker" superClass="intel.tool.cpp.linker.composerxe.base">
-								<option id="intel.linkstep.perflibs.daal.1597150327" name="Use Intel(R) Data Analytics Acceleration Library" superClass="intel.linkstep.perflibs.daal" value="perflibs.daal.none" valueType="enumerated"/>
-								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="intel.linkstep.libpath.1003026857" name="Search Directory for Libraries (-L)" superClass="intel.linkstep.libpath" valueType="stringList">
-									<listOptionValue builtIn="false" value="../../../lib"/>
-								</option>
-								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="intel.linkstep.libname.1001904055" name="Additional Libraries (-l)" superClass="intel.linkstep.libname" valueType="libs">
-									<listOptionValue builtIn="false" value="nma"/>
-									<listOptionValue builtIn="false" value="pdb2"/>
-									<listOptionValue builtIn="false" value="tools"/>
-									<listOptionValue builtIn="false" value="rt"/>
-								</option>
-								<option id="intel.linkstep.perflibs.mkl.1730207881" name="Use Intel(R) Math Kernel Library (-mkl=[arg])" superClass="intel.linkstep.perflibs.mkl" value="perflibs.mkl.parallel" valueType="enumerated"/>
-								<option id="intel.linkstep.general.optimization2.2009137714" name="Optimization Level" superClass="intel.linkstep.general.optimization2" value="general.opt.speedHLO" valueType="enumerated"/>
-								<option id="intel.linkstep.parallel.1247343277" name="Parallelization (-parallel)" superClass="intel.linkstep.parallel" value="false" valueType="boolean"/>
-								<inputType id="intel.linkstep.input.256540606" superClass="intel.linkstep.input">
-									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
-									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
-								</inputType>
-								<outputType id="intel.linkstep.output.1855968440" outputPrefix="../../../bin/" superClass="intel.linkstep.output"/>
-							</tool>
-							<tool id="intel.tool.c.linker.composerxe.base.2095863946" name="Intel C Linker" superClass="intel.tool.c.linker.composerxe.base"/>
-						</toolChain>
-					</folderInfo>
-				</configuration>
-			</storageModule>
-			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
-			<storageModule moduleId="intel.option.toolchain.productId">intel-comp-l-all-devel-150-16.0.1-150.x86_64.rpm_16.0.150.150#-324126673-806050265</storageModule>
-		</cconfiguration>
-		<cconfiguration id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070.1238142809">
-			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070.1238142809" moduleId="org.eclipse.cdt.core.settings" name="Release_gcc">
-				<externalSettings/>
-				<extensions>
-					<extension id="org.eclipse.cdt.core.GNU_ELF" point="org.eclipse.cdt.core.BinaryParser"/>
-					<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.ICCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-				</extensions>
-			</storageModule>
-			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-				<configuration artifactName="${ProjName}_gcc" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release" description="" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator;org.eclipse.cdt.core.ICCErrorParser" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070.1238142809" name="Release_gcc" optionalBuildProperties="org.eclipse.cdt.docker.launcher.containerbuild.property.selectedvolumes=,org.eclipse.cdt.docker.launcher.containerbuild.property.volumes=" parent="intel.config.composerxe.exe.release" postannouncebuildStep="" postbuildStep="" preannouncebuildStep="" prebuildStep="">
-					<folderInfo id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070.1238142809." name="/" resourcePath="">
-						<toolChain id="cdt.managedbuild.toolchain.gnu.base.1541779389" name="Linux GCC" superClass="cdt.managedbuild.toolchain.gnu.base">
-							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.GNU_ELF" id="cdt.managedbuild.target.gnu.platform.base.104251230" name="Debug Platform" osList="linux,hpux,aix,qnx" superClass="cdt.managedbuild.target.gnu.platform.base"/>
-							<builder buildPath="${workspace_loc:/ilmode}/Release_gcc" enableAutoBuild="true" id="cdt.managedbuild.target.gnu.builder.base.990181774" keepEnvironmentInBuildfile="false" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.base"/>
-							<tool id="cdt.managedbuild.tool.gnu.archiver.base.1288922075" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.base"/>
-							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.base.433550469" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.base">
-								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.compiler.option.include.paths.1810558602" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
-									<listOptionValue builtIn="false" value="../../../src"/>
-								</option>
-								<option id="gnu.cpp.compiler.option.optimization.level.1843729227" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.optimization.level.most" valueType="enumerated"/>
-								<option defaultValue="gnu.cpp.compiler.debugging.level.none" id="gnu.cpp.compiler.option.debugging.level.560677771" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" useByScannerDiscovery="false" valueType="enumerated"/>
-								<option id="gnu.cpp.compiler.option.dialect.std.1331750442" name="Language standard" superClass="gnu.cpp.compiler.option.dialect.std" useByScannerDiscovery="true" value="gnu.cpp.compiler.dialect.default" valueType="enumerated"/>
-								<option id="gnu.cpp.compiler.option.other.other.1254772274" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" useByScannerDiscovery="false" value="-Wunused-variable  -Wmaybe-uninitialized  -U_FORTIFY_SOURCE  -fpermissive  -c -fmessage-length=0 " valueType="string"/>
-								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.755456922" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
-							</tool>
-							<tool id="cdt.managedbuild.tool.gnu.c.compiler.base.1046629612" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base">
-								<option defaultValue="gnu.c.optimization.level.most" id="gnu.c.compiler.option.optimization.level.1333604632" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" useByScannerDiscovery="false" valueType="enumerated"/>
-								<option defaultValue="gnu.c.debugging.level.none" id="gnu.c.compiler.option.debugging.level.218574722" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" useByScannerDiscovery="false" valueType="enumerated"/>
-								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1780798286" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
-							</tool>
-							<tool id="cdt.managedbuild.tool.gnu.c.linker.base.1708715603" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.base"/>
-							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.1700756106" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
-								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.link.option.libs.2001983061" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
-									<listOptionValue builtIn="false" value="nma_gcc"/>
-									<listOptionValue builtIn="false" value="pdb2_gcc"/>
-									<listOptionValue builtIn="false" value="tools_gcc"/>
-									<listOptionValue builtIn="false" value="lapack"/>
-									<listOptionValue builtIn="false" value="blas"/>
-								</option>
-								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.link.option.paths.161445557" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
-									<listOptionValue builtIn="false" value="../../../lib"/>
-								</option>
-								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1389979911" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
-									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
-									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
-								</inputType>
-								<outputType id="cdt.managedbuild.tool.gnu.cpp.linker.output.1448589692" outputPrefix="../../../bin/" superClass="cdt.managedbuild.tool.gnu.cpp.linker.output"/>
-							</tool>
-							<tool id="cdt.managedbuild.tool.gnu.assembler.base.844272797" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.base">
-								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1497578068" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
-							</tool>
-						</toolChain>
-					</folderInfo>
-				</configuration>
-			</storageModule>
-			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
-			<storageModule moduleId="intel.option.toolchain.productId">intel-comp-l-all-devel-150-16.0.1-150.x86_64.rpm_16.0.150.150#-324126673-806050265</storageModule>
-		</cconfiguration>
-	</storageModule>
-	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-		<project id="ilmode.intel.target.composerxe.exe.765334552" name="Executable" projectType="intel.target.composerxe.exe"/>
-	</storageModule>
-	<storageModule moduleId="scannerConfiguration">
-		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-	</storageModule>
-	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
-	<storageModule moduleId="refreshScope" versionNumber="2">
-		<configuration configurationName="Release_gcc"/>
-		<configuration configurationName="Release_intel"/>
-		<configuration configurationName="Debug">
-			<resource resourceType="PROJECT" workspacePath="/ilmode"/>
-		</configuration>
-		<configuration configurationName="Release">
-			<resource resourceType="PROJECT" workspacePath="/ilmode"/>
-		</configuration>
-	</storageModule>
-	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
+    	
+    <storageModule moduleId="org.eclipse.cdt.core.settings">
+        		
+        <cconfiguration id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070">
+            			
+            <storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070" moduleId="org.eclipse.cdt.core.settings" name="Release_intel">
+                				
+                <externalSettings/>
+                				
+                <extensions>
+                    					
+                    <extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
+                    					
+                    <extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+                    					
+                    <extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
+                    					
+                    <extension id="org.eclipse.cdt.core.ICCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+                    				
+                </extensions>
+                			
+            </storageModule>
+            			
+            <storageModule moduleId="cdtBuildSystem" version="4.0.0">
+                				
+                <configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release" description="" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator;org.eclipse.cdt.core.ICCErrorParser" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070" name="Release_intel" optionalBuildProperties="org.eclipse.cdt.docker.launcher.containerbuild.property.selectedvolumes=,org.eclipse.cdt.docker.launcher.containerbuild.property.volumes=" parent="intel.config.composerxe.exe.release" postannouncebuildStep="" postbuildStep="" preannouncebuildStep="" prebuildStep="">
+                    					
+                    <folderInfo id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070." name="/" resourcePath="">
+                        						
+                        <toolChain errorParsers="org.eclipse.cdt.core.ICCErrorParser" id="intel.toolchain.composerxe.exe.release.1627187155" name="Intel(R) C++ Compiler XE" superClass="intel.toolchain.composerxe.exe.release">
+                            							
+                            <targetPlatform binaryParser="org.eclipse.cdt.core.ELF" id="intel.platform.composerxe.base.143873093" isAbstract="false" name="intel.platform.base" superClass="intel.platform.composerxe.base"/>
+                            							
+                            <builder buildPath="${workspace_loc:/ilmode}/Release" enableAutoBuild="true" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator" id="intel.builder.composerxe.makebuilder.358077950" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="intel.builder.composerxe.makebuilder"/>
+                            							
+                            <tool id="intel.tool.archiver.composerxe.base.1034808966" name="Intel Archiver" superClass="intel.tool.archiver.composerxe.base"/>
+                            							
+                            <tool command="icpc" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.ICCErrorParser" id="intel.tool.cpp.compiler.composerxe.base.1005405361" name="Intel C++ Compiler" superClass="intel.tool.cpp.compiler.composerxe.base">
+                                								
+                                <option defaultValue="false" id="intel.compilestep.general.debug.1721299502" name="Include Debug Information (-g)" superClass="intel.compilestep.general.debug" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+                                								
+                                <option defaultValue="general.opt.speed" id="intel.compilestep.general.optimization2.2027257000" name="Optimization Level" superClass="intel.compilestep.general.optimization2" useByScannerDiscovery="false" value="general.opt.speedHLO" valueType="enumerated"/>
+                                								
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="intel.compilestep.preprocessor.includedirectories.1151641873" name="Additional Include Directories (-I)" superClass="intel.compilestep.preprocessor.includedirectories" useByScannerDiscovery="false" valueType="includePath">
+                                    									
+                                    <listOptionValue builtIn="false" value="../../../src"/>
+                                    								
+                                </option>
+                                								
+                                <option id="intel.compilestep.optimization.inline.expand1.432962423" name="Inline Function Expansion" superClass="intel.compilestep.optimization.inline.expand1" useByScannerDiscovery="false" value="inl.exp1.anysuitable" valueType="enumerated"/>
+                                								
+                                <option id="intel.compilestep.perflibs.mkl.1438921033" name="Use Intel(R) Math Kernel Library (-mkl=[arg])" superClass="intel.compilestep.perflibs.mkl" useByScannerDiscovery="false" value="perflibs.mkl.parallel" valueType="enumerated"/>
+                                								
+                                <option id="intel.compilestep.debug.parallel.1889830929" name="Enable Parallel Debug Checks (-debug parallel)" superClass="intel.compilestep.debug.parallel" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+                                								
+                                <option id="intel.compilestep.coptions.607788650" name="Additional Options" superClass="intel.compilestep.coptions" useByScannerDiscovery="false" value="" valueType="string"/>
+                                								
+                                <option id="intel.compilestep.optimization.fp.1045845348" name="Provide Frame Pointers (-fno-omit-frame-pointer)" superClass="intel.compilestep.optimization.fp" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+                                								
+                                <option id="intel.compilestep.optimization.ipo.844395992" name="Enable Whole Program Optimization (-ipo)" superClass="intel.compilestep.optimization.ipo" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+                                								
+                                <option id="intel.compilestep.optimization.ip.deprecated.137064974" name="Enable Interprocedural Optimization for Single File Compilation (-ip)" superClass="intel.compilestep.optimization.ip.deprecated" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+                                								
+                                <option id="intel.compilestep.optimization.parallel.1461511595" name="Parallelization (-parallel)" superClass="intel.compilestep.optimization.parallel" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+                                								
+                                <option id="intel.compilestep.perflibs.tbb.642531013" name="Use Intel(R) Threading Building Blocks Library (-tbb)" superClass="intel.compilestep.perflibs.tbb" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+                                								
+                                <option id="intel.compilestep.optimization.no.intrin.inline.784794339" name="Disable Intrinsic Inline Expansion (-nolib-inline)" superClass="intel.compilestep.optimization.no.intrin.inline" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+                                								
+                                <option id="intel.compilestep.optimization.fp_leaf.1983369072" name="Omit frame pointer for leaf routines (-momit-leaf-frame-pointer)" superClass="intel.compilestep.optimization.fp_leaf" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+                                								
+                                <inputType id="intel.cpp.compilestep.input.1813759831" name="C Sources" superClass="intel.cpp.compilestep.input"/>
+                                								
+                                <inputType id="intel.cpp.compilestep.asm.primary.1478042185" superClass="intel.cpp.compilestep.asm.primary"/>
+                                								
+                                <inputType id="intel.cpp.compilestep.asm.247812895" superClass="intel.cpp.compilestep.asm"/>
+                                							
+                            </tool>
+                            							
+                            <tool command="icc" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.ICCErrorParser" id="intel.tool.c.compiler.composerxe.base.996054199" name="Intel C Compiler" superClass="intel.tool.c.compiler.composerxe.base">
+                                								
+                                <option defaultValue="false" id="intel.compilestep.general.debug.1302680299" name="Include Debug Information (-g)" superClass="intel.compilestep.general.debug" useByScannerDiscovery="false" valueType="boolean"/>
+                                								
+                                <option defaultValue="general.opt.speed" id="intel.compilestep.general.optimization2.2127210813" name="Optimization Level" superClass="intel.compilestep.general.optimization2" useByScannerDiscovery="false" valueType="enumerated"/>
+                                								
+                                <inputType id="intel.c.compilestep.input.1787011622" name="C Sources" superClass="intel.c.compilestep.input"/>
+                                								
+                                <inputType id="intel.c.compilestep.asm.primary.725180964" superClass="intel.c.compilestep.asm.primary"/>
+                                								
+                                <inputType id="intel.c.compilestep.asm.1012992408" superClass="intel.c.compilestep.asm"/>
+                                							
+                            </tool>
+                            							
+                            <tool command="icpc" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.ICCErrorParser" id="intel.tool.cpp.linker.composerxe.base.505047108" name="Intel C++ Linker" superClass="intel.tool.cpp.linker.composerxe.base">
+                                								
+                                <option id="intel.linkstep.perflibs.daal.1597150327" name="Use Intel(R) Data Analytics Acceleration Library" superClass="intel.linkstep.perflibs.daal" useByScannerDiscovery="false" value="perflibs.daal.none" valueType="enumerated"/>
+                                								
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="intel.linkstep.libpath.1003026857" name="Search Directory for Libraries (-L)" superClass="intel.linkstep.libpath" useByScannerDiscovery="false" valueType="stringList">
+                                    									
+                                    <listOptionValue builtIn="false" value="../../../lib"/>
+                                    								
+                                </option>
+                                								
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="intel.linkstep.libname.1001904055" name="Additional Libraries (-l)" superClass="intel.linkstep.libname" useByScannerDiscovery="false" valueType="libs">
+                                    									
+                                    <listOptionValue builtIn="false" value="nma"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="pdb2"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="tools"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="rt"/>
+                                    								
+                                </option>
+                                								
+                                <option id="intel.linkstep.perflibs.mkl.1730207881" name="Use Intel(R) Math Kernel Library (-mkl=[arg])" superClass="intel.linkstep.perflibs.mkl" useByScannerDiscovery="false" value="perflibs.mkl.parallel" valueType="enumerated"/>
+                                								
+                                <option id="intel.linkstep.general.optimization2.2009137714" name="Optimization Level" superClass="intel.linkstep.general.optimization2" useByScannerDiscovery="false" value="general.opt.speedHLO" valueType="enumerated"/>
+                                								
+                                <option id="intel.linkstep.parallel.1247343277" name="Parallelization (-parallel)" superClass="intel.linkstep.parallel" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+                                								
+                                <inputType id="intel.linkstep.input.256540606" superClass="intel.linkstep.input">
+                                    									
+                                    <additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
+                                    									
+                                    <additionalInput kind="additionalinput" paths="$(LIBS)"/>
+                                    								
+                                </inputType>
+                                								
+                                <outputType id="intel.linkstep.output.1855968440" outputPrefix="../../../bin/" superClass="intel.linkstep.output"/>
+                                							
+                            </tool>
+                            							
+                            <tool id="intel.tool.c.linker.composerxe.base.2095863946" name="Intel C Linker" superClass="intel.tool.c.linker.composerxe.base"/>
+                            						
+                        </toolChain>
+                        					
+                    </folderInfo>
+                    				
+                </configuration>
+                			
+            </storageModule>
+            			
+            <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+            			
+            <storageModule moduleId="intel.option.toolchain.productId">intel-comp-l-all-devel-150-16.0.1-150.x86_64.rpm_16.0.150.150#-324126673-806050265</storageModule>
+            		
+        </cconfiguration>
+        		
+        <cconfiguration id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070.1238142809">
+            			
+            <storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070.1238142809" moduleId="org.eclipse.cdt.core.settings" name="Release_gcc">
+                				
+                <externalSettings/>
+                				
+                <extensions>
+                    					
+                    <extension id="org.eclipse.cdt.core.GNU_ELF" point="org.eclipse.cdt.core.BinaryParser"/>
+                    					
+                    <extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+                    					
+                    <extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
+                    					
+                    <extension id="org.eclipse.cdt.core.ICCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+                    					
+                    <extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+                    					
+                    <extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+                    					
+                    <extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+                    				
+                </extensions>
+                			
+            </storageModule>
+            			
+            <storageModule moduleId="cdtBuildSystem" version="4.0.0">
+                				
+                <configuration artifactName="${ProjName}_gcc" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release" description="" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator;org.eclipse.cdt.core.ICCErrorParser" id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070.1238142809" name="Release_gcc" optionalBuildProperties="org.eclipse.cdt.docker.launcher.containerbuild.property.selectedvolumes=,org.eclipse.cdt.docker.launcher.containerbuild.property.volumes=" parent="intel.config.composerxe.exe.release" postannouncebuildStep="" postbuildStep="" preannouncebuildStep="" prebuildStep="">
+                    					
+                    <folderInfo id="intel.config.composerxe.exe.release.721371040.700597750.1283462040.1793093070.1238142809." name="/" resourcePath="">
+                        						
+                        <toolChain id="cdt.managedbuild.toolchain.gnu.base.1541779389" name="Linux GCC" superClass="cdt.managedbuild.toolchain.gnu.base">
+                            							
+                            <targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.GNU_ELF" id="cdt.managedbuild.target.gnu.platform.base.104251230" name="Debug Platform" osList="linux,hpux,aix,qnx" superClass="cdt.managedbuild.target.gnu.platform.base"/>
+                            							
+                            <builder buildPath="${workspace_loc:/ilmode}/Release_gcc" enableAutoBuild="true" id="cdt.managedbuild.target.gnu.builder.base.990181774" keepEnvironmentInBuildfile="false" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.base"/>
+                            							
+                            <tool id="cdt.managedbuild.tool.gnu.archiver.base.1288922075" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.base"/>
+                            							
+                            <tool id="cdt.managedbuild.tool.gnu.cpp.compiler.base.433550469" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.base">
+                                								
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.compiler.option.include.paths.1810558602" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+                                    									
+                                    <listOptionValue builtIn="false" value="../../../src"/>
+                                    								
+                                </option>
+                                								
+                                <option id="gnu.cpp.compiler.option.optimization.level.1843729227" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.optimization.level.most" valueType="enumerated"/>
+                                								
+                                <option defaultValue="gnu.cpp.compiler.debugging.level.none" id="gnu.cpp.compiler.option.debugging.level.560677771" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" useByScannerDiscovery="false" valueType="enumerated"/>
+                                								
+                                <option id="gnu.cpp.compiler.option.dialect.std.1331750442" name="Language standard" superClass="gnu.cpp.compiler.option.dialect.std" useByScannerDiscovery="true" value="gnu.cpp.compiler.dialect.default" valueType="enumerated"/>
+                                								
+                                <option id="gnu.cpp.compiler.option.other.other.1254772274" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" useByScannerDiscovery="false" value="-Wunused-variable  -Wmaybe-uninitialized  -U_FORTIFY_SOURCE  -fpermissive  -c -fmessage-length=0 " valueType="string"/>
+                                								
+                                <inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.755456922" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
+                                							
+                            </tool>
+                            							
+                            <tool id="cdt.managedbuild.tool.gnu.c.compiler.base.1046629612" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base">
+                                								
+                                <option defaultValue="gnu.c.optimization.level.most" id="gnu.c.compiler.option.optimization.level.1333604632" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" useByScannerDiscovery="false" valueType="enumerated"/>
+                                								
+                                <option defaultValue="gnu.c.debugging.level.none" id="gnu.c.compiler.option.debugging.level.218574722" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" useByScannerDiscovery="false" valueType="enumerated"/>
+                                								
+                                <inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1780798286" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
+                                							
+                            </tool>
+                            							
+                            <tool id="cdt.managedbuild.tool.gnu.c.linker.base.1708715603" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.base"/>
+                            							
+                            <tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.1700756106" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
+                                								
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.link.option.libs.2001983061" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
+                                    									
+                                    <listOptionValue builtIn="false" value="nma_gcc"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="pdb2_gcc"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="tools_gcc"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="lapack"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="blas"/>
+                                    								
+                                </option>
+                                								
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.link.option.paths.161445557" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
+                                    									
+                                    <listOptionValue builtIn="false" value="../../../lib"/>
+                                    								
+                                </option>
+                                								
+                                <inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1389979911" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
+                                    									
+                                    <additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
+                                    									
+                                    <additionalInput kind="additionalinput" paths="$(LIBS)"/>
+                                    								
+                                </inputType>
+                                								
+                                <outputType id="cdt.managedbuild.tool.gnu.cpp.linker.output.1448589692" outputPrefix="../../../bin/" superClass="cdt.managedbuild.tool.gnu.cpp.linker.output"/>
+                                							
+                            </tool>
+                            							
+                            <tool id="cdt.managedbuild.tool.gnu.assembler.base.844272797" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.base">
+                                								
+                                <inputType id="cdt.managedbuild.tool.gnu.assembler.input.1497578068" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
+                                							
+                            </tool>
+                            						
+                        </toolChain>
+                        					
+                    </folderInfo>
+                    				
+                </configuration>
+                			
+            </storageModule>
+            			
+            <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+            			
+            <storageModule moduleId="intel.option.toolchain.productId">intel-comp-l-all-devel-150-16.0.1-150.x86_64.rpm_16.0.150.150#-324126673-806050265</storageModule>
+            		
+        </cconfiguration>
+        	
+    </storageModule>
+    	
+    <storageModule moduleId="cdtBuildSystem" version="4.0.0">
+        		
+        <project id="ilmode.intel.target.composerxe.exe.765334552" name="Executable" projectType="intel.target.composerxe.exe"/>
+        	
+    </storageModule>
+    	
+    <storageModule moduleId="scannerConfiguration">
+        		
+        <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+        	
+    </storageModule>
+    	
+    <storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+    	
+    <storageModule moduleId="refreshScope" versionNumber="2">
+        		
+        <configuration configurationName="Release_gcc"/>
+        		
+        <configuration configurationName="Release_intel"/>
+        		
+        <configuration configurationName="Debug">
+            			
+            <resource resourceType="PROJECT" workspacePath="/ilmode"/>
+            		
+        </configuration>
+        		
+        <configuration configurationName="Release">
+            			
+            <resource resourceType="PROJECT" workspacePath="/ilmode"/>
+            		
+        </configuration>
+        	
+    </storageModule>
+    	
+    <storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
+    
 </cproject>

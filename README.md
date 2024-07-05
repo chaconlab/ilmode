@@ -97,5 +97,10 @@ ilmode 3irs.pdb  66 76 --chain C -t 3k4w.pdb -m 2 -a 1 --drmsd 0.25 -x  -o  _mor
 
 * [REMD/](REMD) Benchmark set of 15 exposed and diverse loops employed to test loop predictions using Replica Exchange Molecular simulations (REMD) with RSFF2C force field (Feng, J.J., et al. Accurate Structure Prediction for Protein Loops Based on Molecular Dynamics Simulations with RSFF2C. J Chem Theory Comput 2021;17(7):4614-4628). These loops had a resolution of <2.0 Å, Rfactor < 0.3, sequence identity <20%, and an average B-factor <35. We extend the length of the loop one residue at both ends to minimize the deviations of the anchors found in the REMD simulations. The size of the loops ranges from 12 to 18 residues. The initial MD structures were prepared via implicit MD simulations at high temperatures to guarantee to be far away from the crystallographic ones (>10 Å). Trajectories (last microsecond), initial REMD structures, and the corresponding simulations were kindly provided by the authors, with structures already superimposed by the anchors.
 
+## Source Code
+
+The complete source C++ code of KORPM  is under [sbg](sbg) directory. Just execute compile_ilmode.sh script.
+
+
 ## Funding
 This work was supported by Spanish grants PID2019-109041GB-C21/AEI/10.13039/501100011033 
